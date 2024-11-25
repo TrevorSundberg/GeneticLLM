@@ -1,0 +1,136 @@
+
+Write this like a genetic algorithm
+ - generate all the sources
+ - each sets of sources that get closer to the answer
+
+we let each AI go a number of "iterations" to step toward the goal
+ - we measure fitness first by correct compilations, and inverse length of compile errors
+ - then by how close we get to matching the output of each test (can just use inverse length of diff reports)
+ - then by number of tests passed
+ - tiered system
+
+run many variations, or "children"
+ - potentailly even allow seed attempts by the user
+
+run them with an initial seed, get a fitness score
+
+but we're kind of saying that the code is the gene, so the thing develops it's own genes...
+
+but also that kind of is the seed, the gene is the solution
+
+so every one of them starts of generating a solution, just initially
+ - different seed, no randomness
+
+aight, gonna run this on a super-comp
+
+it's a genetic framework with AI results
+
+mutation can be like find a token and replace it,
+or a single character, or ask the llm to mutate... lots of options
+
+
+when we write asserts, we should do it by running it over all test outputs from the original sources
+ - the asserts should pass every test
+ - then the cool thing is we can run the asserts against the outputs
+
+for scoring, we should take the best iteration (like score each pass that it makes, take the highest)
+ - basically how many iterations is how many times we're allowing the LLM to give feedback
+
+for C, can compile with as many linters as we want
+ - just to give better feedback to the AI, not allow compilation with any linting errors
+ - also pass ansi-pedantic -Wall -Wextra style
+
+
+
+we translate file by file, expecting files to not outdo the context size
+ - in a robust version, we cap the input and output size so we can't exceeed context
+ - may want to be able to recompile the source too
+   - as we might want to make modifications to break it up and make it easier to translate
+
+since we're going file by file, when errors are reported, they will have the file names (ideally)
+ - the AI can respond to the errors and file names
+
+the initial AI makes a translation pass for every compilation unit (file)
+
+we have an agent that allows the AI to pick the file to make edits to
+
+
+scoring, 0/1 for compiling
+
+if it's not compiling, then the score is negative by the length of the compiler errors
+ - not a perfect metric, but it's an approximation
+ - can do something later that counts the number of errors
+   - but that's not even perfect, it's possible to have 100 errors but a one letter change to fix it
+   - but also have 10 errors, and each require their own fix 
+ - so ultimately it's just an approximation
+
+for positive scores, +1 for every unit test passed
+ - or, really + [0,1], where the value is how close the output is to the expected output
+
+
+inputs are:
+ - population size
+ - llm iterations
+ - mutation rate
+ - 
+
+alternatively, if we want a fitness that converges to 0
+
+if it doesn't compile:
+finess: -(test_count + error_count)
+
+if it compiles:
+fintess: failing_tests
+
+if it passes all tests:
+measure performance
+
+>= 0 fitness means we have a correct solution
+
+side note, fitness doesn't need to be boiled down to a single number
+ - as long as it's a comparable key
+
+GeneticLLM is a pretty cool name actually
+genetic_llm
+
+genetic_llama
+
+
+-------------
+side note, at the end of each iteration, the genetic code can
+have extra parameters that allow it to generate new unit tests
+ - we can base initial extras off the initial code
+ - but it might be beneficial to get more off generated target code
+ - again, we're just asking the LLM for all this anyways
+
+we can even do some de-duping to try and reduce inputs that all have the same output (error, etc)
+
+genetic prompt engineering
+
+genetic code translation
+
+
+-------------------------
+
+this is going to be my proof
+
+if I can take a reasonably complex code and wake up in the morning and see it translated...
+
+then I will buy the superpower machine, it's worth it
+I can just start translating things
+
+GeneticLLM
+ - code translation
+ - prompt engineering
+
+how do we do the prompt engineering?
+ - we have to define a goal
+ - a set of test cases, similar to code
+ - maybe even a grammar
+
+it's similar to the compiler approach, but we don't have compiler errors or performance... or maybe we do have performance?
+ - I'm actually not sure, do LLMs take longer with different prompts?
+
+
+
+

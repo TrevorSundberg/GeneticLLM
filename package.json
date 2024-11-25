@@ -1,0 +1,21 @@
+{
+  "name": "sourceloom",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "tsc && node dist/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@huggingface/transformers": "^3.0.2",
+    "@types/node": "^22.9.0",
+    "@types/seedrandom": "^3.0.8",
+    "node-llama-cpp": "^3.2.0",
+    "seedrandom": "^3.0.5",
+    "ts-json-schema-generator": "^2.3.0",
+    "typescript": "^5.6.3"
+  }
+}
