@@ -68,7 +68,7 @@ const execute = async (command: string, options?: Execute): Promise<string> => {
       stdio: "pipe",
       input: options?.stdin,
       killSignal: "SIGKILL",
-      });
+    });
   } catch (err) {
     console.log(err)
     return `${err}`;
@@ -169,7 +169,7 @@ const execute = async (command: string, options?: Execute): Promise<string> => {
   let prompting = false;
   
   const config = await geneticCodeConfig({
-    populationSize: 40,
+    populationSize: 30,
     language: "commented standard C with no libraries",
     sourceOrInstructions: await fs.promises.readFile("./clone.js", "utf8"),
     testInputs: testCases,
@@ -211,7 +211,7 @@ const execute = async (command: string, options?: Execute): Promise<string> => {
   
       console.log("SEED:", seed, "PROMPT:", prompt);
       const result = await session.prompt(prompt, {
-        temperature: 0.7,
+        temperature: 1.0,
         seed,
         grammar,
         onTextChunk(text) {
@@ -227,7 +227,7 @@ const execute = async (command: string, options?: Execute): Promise<string> => {
   });
 
   let population: CodeCandidate[] = [];
-  for (let i = 0; i < 20; ++i) {
+  for (let i = 0; i < 30; ++i) {
     console.log(`+++ GENERATION ${i} +++`);
     const measured = await geneticPass(config, population);
     console.log(JSON.stringify(measured, null, 2));
