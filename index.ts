@@ -3,6 +3,7 @@ import fs from "node:fs";
 import assert from "node:assert";
 import {GeneticConfig, geneticPass} from "./genetic";
 import { CodeCandidate, geneticCodeConfig } from "./geneticCode";
+import { execSync } from "node:child_process";
 
 /*
 (async() => {
@@ -57,53 +58,21 @@ interface Execute {
   timeout?: number;
 }
 
+// // Not technically asnyc, but doing this to keep our options open
 const execute = async (command: string, options?: Execute): Promise<string> => {
-  // TODO(trevor): Increase this or have it be user controllable, but this is all user code for now
-  const MAX_OUTPUT = 1024 * 1024;
-  const { spawn } = await import("node:child_process");
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, { shell: true });
-    let output = '';
-    const appenOutput = (data: string) => {
-      output += data;
-      if (output.length > MAX_OUTPUT) {
-        child.kill();
-        resolve('Error: Output too long');
-      }
-    };
-    if (options?.stdin) {
-      child.stdin.write(options.stdin);
-      child.stdin.end();
-    }
-    if (options?.timeout) {
-      const timeoutId = setTimeout(() => {
-        child.kill();
-        resolve('Error: Process timed out');
-      }, options.timeout);
-
-      child.on('exit', () => {
-        clearTimeout(timeoutId);
+  console.log(command);
+  try {
+    return execSync(command, {
+      encoding: "utf8",
+      timeout: options?.timeout,
+      stdio: "pipe",
+      input: options?.stdin,
+      killSignal: "SIGKILL",
       });
-    }
-
-    child.stdout.on('data', (data) => {
-      output += data.toString();
-    });
-
-    child.stderr.on('data', (data) => {
-      output += data.toString();
-    });
-
-    child.on('close', (code) => {
-      // TODO: (trevor) handle non-zero exit codes
-      resolve(output);
-    });
-
-    child.on('error', (error) => {
-      child.kill();
-      reject(error);
-    });
-  });
+  } catch (err) {
+    console.log(err)
+    return `${err}`;
+  }
 };
 
 /*
