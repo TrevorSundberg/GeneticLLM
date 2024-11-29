@@ -131,7 +131,16 @@ export const geneticPass = async <Candidate, Fitness>(
     const crossoverRoll = random();
     if (crossoverRoll < defaulted(config.crossoverRate, 0.7)) {
       const candidateA = selectCandidate();
-      const candidateB = selectCandidate();
+      let candidateB = selectCandidate();
+
+      // We already have a case for candidate graduation (neither a diverse injection nor a crossover/breed)
+      // However, it's possible that breeding selects the same candidate, we allow this
+      if (measuredPopulation.length > 1) {
+        while (candidateA === candidateB) {
+          candidateB = selectCandidate();
+        }
+      }
+
       console.log("ADDING CROSSOVER CANDIDATE", candidateA, candidateB);
 
       // Perform both breeding and then mutation at the given mutation rate
