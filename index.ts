@@ -72,9 +72,17 @@ const execute = async (command: string, options?: Execute): Promise<string> => {
       input: options?.stdin,
       killSignal: "SIGTERM",
     });
-  } catch (err) {
-    console.log(err)
-    return `${err}`;
+  } catch (err: any) {
+    if (err.code === 'ENOBUFS') {
+      return `Failed stdout too large:\n${err.stdout}`;
+    }
+    if (err.code === 'ETIMEOUT') {
+      return `Failed timed out:\n${err.stdout}`;
+    }
+    if (err.status) {
+      return `Failed with exit code: ${err.status}\n${err.stdout}`;
+    }
+    return `Failed:\n${err.stdout}`;
   }
 };
 
@@ -182,13 +190,13 @@ const execute = async (command: string, options?: Execute): Promise<string> => {
       const sourceFile = `/output/${candidate.uniqueSeed}_source.c`;
       await fs.promises.mkdir("output", {recursive: true});
       await fs.promises.writeFile(`.${sourceFile}`, candidate.source);
-      const output = await execute(`docker run -v ./output:/output --rm genetic_llm/clang /opt/wasi-sdk/bin/clang --target=wasm32-wasi -fstack-protector-all  -fno-omit-frame-pointer -g3  ${sourceFile} -o /output/${candidate.uniqueSeed}_compiled.wasm`);
+      const output = await execute(`docker run -v ./output:/output --rm genetic_llm/clang /opt/wasi-sdk/bin/clang --target=wasm32-wasi -fstack-protector-all -fno-omit-frame-pointer -g3  ${sourceFile} -o /output/${candidate.uniqueSeed}_compiled.wasm 2>&1`);
       return output.replaceAll(sourceFile, "src.c");
     },
 
     async runCompiled(candidate, input) {
       const executeOpts: Execute = { stdin: input, timeout: 10 * 1000 };
-      return execute(`docker run -v ./output:/output --rm genetic_llm/clang wasmtime /output/${candidate.uniqueSeed}_compiled.wasm`, executeOpts);
+      return execute(`docker run -v ./output:/output --rm genetic_llm/clang bash -c "WASMTIME_BACKTRACE_DETAILS=1 wasmtime /output/${candidate.uniqueSeed}_compiled.wasm 2>&1"`, executeOpts);
     },
 
     //async runCompiled(candidate, input) {
