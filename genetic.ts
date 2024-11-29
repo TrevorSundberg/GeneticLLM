@@ -30,7 +30,7 @@ export interface GeneticConfigTweakables {
   crossoverRate?: number;
 
   // A [0, 1] probability of mutation for a gene within the candidate
-  // Default is 0.01
+  // Default is 0.001
   mutationRate?: number;
 }
 
@@ -110,7 +110,7 @@ export const geneticPass = async <Candidate, Fitness>(
   // If a mutation function was provided, use it to mutate our candidate
   const mutate = (candidate: Candidate) =>
     config.mutate
-      ? config.mutate(candidate, defaulted(config.mutationRate, 0.01), random)
+      ? config.mutate(candidate, defaulted(config.mutationRate, 0.001), random)
       : candidate;
 
   for (let i = 0; i < populationSize; ++i) {
