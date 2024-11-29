@@ -58,13 +58,13 @@ export interface CodeGeneticConfig extends GeneticConfigTweakables {
 }
 
 export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
-  const sourceHeader = `Original Source:\n========\n${config.sourceOrInstructions}\n--------\n`;
+  const sourceHeader = `Original Source:\n===\n${config.sourceOrInstructions}\n---\n`;
   let testsHeader = '';
   for (const testInput of config.testInputs) {
     const sampleResult = await config.runSample(testInput);
-    testsHeader += `Test Input:\n========\n${testInput}\n--------\nExpected Output:\n========\n${sampleResult}\n--------\n`;
+    testsHeader += `Test Stdin:\n===\n${testInput}\n---\nExpected Stdout:\n===\n${sampleResult}\n---\n`;
   }
-  const footer = `Strictly output ONLY ${config.language}, no surrounding explanations, nothing else:`;
+  const footer = `Strictly output ONLY safe ${config.language}, no surrounding explanations, no hardcoded test-inputs, nothing else:`;
 
   const compareFitness = (a: CodeFitness, b: CodeFitness): number => {
     if (b.compileErrors !== a.compileErrors) {
@@ -117,17 +117,17 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
           totalRunSeconds: 0,
         };
         if (compileErrors) {
-          newCandidate.source = await config.prompt(newCandidate.uniqueSeed, `${sourceHeader}${testsHeader}Last Translation:\n========\n${newCandidate.source}\n--------\nFix Issues:\n========\n${compileErrors}\n--------\n${footer}`);
+          newCandidate.source = await config.prompt(newCandidate.uniqueSeed, `${sourceHeader}${testsHeader}Last Translation:\n===\n${newCandidate.source}\n---\nFix Issues:\n===\n${compileErrors}\n---\n${footer}`);
         } else {
-          let prompt = `${sourceHeader}Last Translation:\n========\n${newCandidate.source}\n--------\n`;
+          let prompt = `${sourceHeader}Last Translation:\n===\n${newCandidate.source}\n---\n`;
           for (const testInput of config.testInputs) {
             const sampleResult = await config.runSample(testInput);
             const compiledResult = await config.runCompiled(newCandidate, testInput);
             if (sampleResult !== compiledResult) {
               ++fitness.failedTests;
-              prompt += `Test Input:\n========\n${testInput}\n--------\nErroneous Output:\n========\n${compiledResult}\n--------\nExpected Output:\n========\n${sampleResult}\n--------\n`;
+              prompt += `Test Stdin:\n===\n${testInput}\n---\nErroneous Stdout:\n===\n${compiledResult}\n---\nExpected Stdout:\n===\n${sampleResult}\n---\n`;
             } else {
-              prompt += `Test Input:\n========\n${testInput}\n--------\Correct Output:\n========\n${sampleResult}\n--------\n`;
+              prompt += `Test Stdin:\n===\n${testInput}\n---\nCorrect Stdout:\n===\n${sampleResult}\n---\n`;
             }
           }
 
@@ -166,7 +166,7 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
     async crossoverBreed(a, b, random) {
       const uniqueSeed = newUniqueSeed(random);
       const source = await config.prompt(uniqueSeed,
-        `${sourceHeader}${testsHeader}Translation A:\n========\n${a.source}\n--------\nTranslation B:\n========\n${b.source}\n--------\nCombine translation A and B using 50% from each. ${footer}`);
+        `${sourceHeader}${testsHeader}Translation A:\n===\n${a.source}\n---\nTranslation B:\n===\n${b.source}\n---\nCombine translation A and B using half from each. MUST use lines from both. ${footer}`);
       return {
         uniqueSeed,
         source
