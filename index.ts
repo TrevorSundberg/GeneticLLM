@@ -228,7 +228,7 @@ const execute = async (command: string, options?: Execute): Promise<string> => {
   
       console.log("SEED:", seed, "PROMPT:", prompt);
       const result = await session.prompt(prompt, {
-        temperature: 1.0,
+        temperature: 0.9,
         seed,
         grammar,
         onTextChunk(text) {
