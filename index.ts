@@ -1,7 +1,6 @@
 import process from "node:process";
 import fs from "node:fs";
-import assert from "node:assert";
-import {GeneticConfig, geneticPass} from "./genetic";
+import { geneticPass } from "./genetic";
 import { CodeCandidate, geneticCodeConfig } from "./geneticCode";
 import { execSync } from "node:child_process";
 
@@ -52,7 +51,6 @@ if ("s".startsWith("s")) {
 })();
 */
 
-
 interface Execute {
   stdin?: string;
   timeout?: number;
@@ -60,14 +58,19 @@ interface Execute {
 
 // // Not technically asnyc, but doing this to keep our options open
 const execute = async (command: string, options?: Execute): Promise<string> => {
-  console.log(command);
+  if (options) {
+    console.log(command, `<<< ${options.stdin}`);
+  } else {
+    console.log(command);
+  }
   try {
     return execSync(command, {
+      maxBuffer: 1024 * 10,
       encoding: "utf8",
       timeout: options?.timeout,
       stdio: "pipe",
       input: options?.stdin,
-      killSignal: "SIGKILL",
+      killSignal: "SIGTERM",
     });
   } catch (err) {
     console.log(err)
@@ -176,21 +179,27 @@ const execute = async (command: string, options?: Execute): Promise<string> => {
     runSample,
 
     async compile(candidate) {
-      const sourceFile = `/tmp/${candidate.uniqueSeed}_source.c`;
-      await fs.promises.writeFile(sourceFile, candidate.source);
-      const output = await execute(`clang ${sourceFile} -g3 -o /tmp/${candidate.uniqueSeed}_compiled`);
+      const sourceFile = `/output/${candidate.uniqueSeed}_source.c`;
+      await fs.promises.mkdir("output", {recursive: true});
+      await fs.promises.writeFile(`.${sourceFile}`, candidate.source);
+      const output = await execute(`docker run -v ./output:/output --rm genetic_llm/clang /opt/wasi-sdk/bin/clang --target=wasm32-wasi -fstack-protector-all  -fno-omit-frame-pointer -g3  ${sourceFile} -o /output/${candidate.uniqueSeed}_compiled.wasm`);
       return output.replaceAll(sourceFile, "src.c");
     },
 
     async runCompiled(candidate, input) {
       const executeOpts: Execute = { stdin: input, timeout: 10 * 1000 };
-      const result = await execute(`/tmp/${candidate.uniqueSeed}_compiled`, executeOpts);
-      if (result.includes("Segmentation fault (core dumped)")) {
-        return execute(`gdb -batch -q -ex run -ex bt --args /tmp/${candidate.uniqueSeed}_compiled`, executeOpts);
-      } else {
-        return result;
-      }
+      return execute(`docker run -v ./output:/output --rm genetic_llm/clang wasmtime /output/${candidate.uniqueSeed}_compiled.wasm`, executeOpts);
     },
+
+    //async runCompiled(candidate, input) {
+    //  const executeOpts: Execute = { stdin: input, timeout: 10 * 1000 };
+    //  const result = await execute(`docker run -v ./output:/output --rm silkeh/clang /output/${candidate.uniqueSeed}_compiled`, executeOpts);
+    //  if (result.includes("Segmentation fault (core dumped)")) {
+    //    return execute(`gdb -batch -q -ex run -ex bt --args /output/${candidate.uniqueSeed}_compiled`, executeOpts);
+    //  } else {
+    //    return result;
+    //  }
+    //},
 
     async testPerformance(code) {
       // TODO(trevor): Don't know that this is a great approach or not
