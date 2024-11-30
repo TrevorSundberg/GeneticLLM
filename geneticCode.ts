@@ -64,7 +64,7 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
     const sampleResult = await config.runSample(testInput);
     testsHeader += `Test Stdin:\n===\n${testInput}\n---\nExpected Stdout:\n===\n${sampleResult}\n---\n`;
   }
-  const footer = `Strictly output ONLY safe ${config.language}, no surrounding explanations, no hardcoded test-inputs, nothing else:`;
+  const footer = `Strictly output ONLY safe ${config.language}, no surrounding explanations, no examples, no hardcoded test-inputs, nothing else:`;
 
   const compareFitness = (a: CodeFitness, b: CodeFitness): number => {
     if (b.compileErrors !== a.compileErrors) {
