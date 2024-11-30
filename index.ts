@@ -2,7 +2,7 @@ import process from "node:process";
 import fs from "node:fs";
 import { geneticPass } from "./genetic";
 import { CodeCandidate, geneticCodeConfig } from "./geneticCode";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 
 /*
 (async() => {
@@ -57,32 +57,29 @@ interface Execute {
 }
 
 // // Not technically asnyc, but doing this to keep our options open
-const execute = async (command: string, options?: Execute): Promise<string> => {
-  if (options) {
-    console.log(command, `<<< ${options.stdin}`);
-  } else {
-    console.log(command);
-  }
+const execute = async (file: string, args: string[], options?: Execute): Promise<string> => {
+  console.log(file, args.join(" "), options ? `<<< ${options.stdin}` : "");
   try {
-    return execSync(command, {
+    return execFileSync(file, args, {
       maxBuffer: 1024 * 10,
       encoding: "utf8",
       timeout: options?.timeout,
       stdio: "pipe",
-      input: options?.stdin,
-      killSignal: "SIGTERM",
+      input: options?.stdin
     });
   } catch (err: any) {
+    console.log(err);
+    const out = [err.stderr, err.stdout].join("\n");
     if (err.code === 'ENOBUFS') {
-      return `Failed stdout too large:\n${err.stdout}`;
+      return `Failed stdout too large:\n${out}`;
     }
-    if (err.code === 'ETIMEOUT') {
-      return `Failed timed out:\n${err.stdout}`;
+    if (err.code === 'ETIMEDOUT') {
+      return `Failed timed out:\n${out}`;
     }
     if (err.status) {
-      return `Failed with exit code: ${err.status}\n${err.stdout}`;
+      return `Failed with exit code: ${err.status}\n${out}`;
     }
-    return `Failed:\n${err.stdout}`;
+    return `Failed:\n${out}`;
   }
 };
 
@@ -157,7 +154,7 @@ const execute = async (command: string, options?: Execute): Promise<string> => {
   //]
 
   const runSample = async (input: string): Promise<string> => {
-    return execute("node clone.js", { stdin: input });
+    return execute("node", ["clone.js"], { stdin: input });
   };
 
   /*
@@ -190,13 +187,36 @@ const execute = async (command: string, options?: Execute): Promise<string> => {
       const sourceFile = `/output/${candidate.uniqueSeed}_source.c`;
       await fs.promises.mkdir("output", {recursive: true});
       await fs.promises.writeFile(`.${sourceFile}`, candidate.source);
-      const output = await execute(`docker run -v ./output:/output --rm genetic_llm/clang /opt/wasi-sdk/bin/clang --target=wasm32-wasi -fstack-protector-all -fno-omit-frame-pointer -g3  ${sourceFile} -o /output/${candidate.uniqueSeed}_compiled.wasm 2>&1`);
+      const output = await execute("docker", [
+        "run",
+        "-v",
+        "./output:/output",
+        "--rm",
+        "genetic_llm/clang",
+        "/opt/wasi-sdk/bin/clang",
+        "--target=wasm32-wasi",
+        "-fstack-protector-all",
+        "-fno-omit-frame-pointer",
+        "-g3",
+        sourceFile,
+        "-o",
+        `/output/${candidate.uniqueSeed}_compiled.wasm`
+      ]);
       return output.replaceAll(sourceFile, "src.c");
     },
 
     async runCompiled(candidate, input) {
       const executeOpts: Execute = { stdin: input, timeout: 10 * 1000 };
-      return execute(`docker run -v ./output:/output --rm genetic_llm/clang bash -c "WASMTIME_BACKTRACE_DETAILS=1 wasmtime /output/${candidate.uniqueSeed}_compiled.wasm 2>&1"`, executeOpts);
+      return execute("docker",
+      [
+        "run",
+        "-v",
+        "./output:/output",
+        "--rm",
+        "genetic_llm/clang",
+        "wasmtime",
+        `/output/${candidate.uniqueSeed}_compiled.wasm`
+      ], executeOpts);
     },
 
     //async runCompiled(candidate, input) {
