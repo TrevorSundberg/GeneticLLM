@@ -210,6 +210,7 @@ const execute = async (file: string, args: string[], options?: Execute): Promise
       return execute("docker",
       [
         "run",
+        "-i",
         "-v",
         "./output:/output",
         "--rm",
