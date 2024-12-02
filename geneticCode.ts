@@ -212,6 +212,9 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
             } else {
               failedAnyTest = true;
               
+              // Asking the LLM for a comparison is great because it can do slightly more in depth analysis
+              // and discover similar patterns between them (meaning the translation can be on the right track)
+              // However the LLM can tend to occasionally hallucinate, so we also use sentence similarity
               const compare = { expected: sampleResult, output: compiledResult };
               const ratingResult = await prompt(
                 newCandidate.uniqueSeed,
@@ -221,10 +224,23 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
               const [ratingStr, ratingReason] = ratingResult.split("\n");
               const rating = parseInt(ratingStr) / 100;
 
+              // Sentence similarity to compare the outputs
+              // This also works really well for comparing the meanings of outputs
+              // However we observed that inputs such as "1" and "1, 2, 3, 4, 5" will result in a high match
+              // Because of this, we also do the length comparison below
               const similarity = await compareStrings(sampleResult, compiledResult);
+
+              // Results in a value between [0, 1]
+              // We always take the length of the smaller string divided by the length of the larger
+              // to see how far off the true length we are (1 means they are the same)
+              const lengthResult = sampleResult.length < compiledResult.length
+                ? sampleResult.length / compiledResult.length
+                : compiledResult.length / sampleResult.length;
+              const lengthCompare = isFinite(lengthResult) ? lengthResult : 0.0;
+
               // We don't ever allow the combined to be 1, as it should never be exactly the same as a passed test
-              const combined = Math.min(rating * 0.5 + similarity * 0.5, 0.999999);
-              console.log("rating", rating, "similarity", similarity, "combined", combined);
+              const combined = Math.min((rating + similarity + lengthCompare) / 3, 0.999999);
+              console.log("rating", rating, "similarity", similarity, "lengthCompare", lengthCompare, "combined", combined);
               fitness.passedTests += combined;
               
               promptText += `Erroneous Stdout:\n===\n${compiledResult}\n---\nExpected Stdout:\n===\n${sampleResult}\n---\n${ratingReason}\n###\n`;
