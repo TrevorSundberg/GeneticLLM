@@ -131,6 +131,107 @@ how do we do the prompt engineering?
 it's similar to the compiler approach, but we don't have compiler errors or performance... or maybe we do have performance?
  - I'm actually not sure, do LLMs take longer with different prompts?
 
+--------------
+
+how to improve genetic algorithm results:
+for one, the 50% mixing doesn't work super well (sometimes it just picks an entire one)
+ - also, can't just mix "genes"
+   - I feel like in real life, you can pick random genes from both
+   - and somehow end up with a still good "solution", or viable living animal
+   - but here, all the schemes I can think of for picking "genes" all create a 99.999% change the being would be dead
+   - basically just code that 
+
+I think what might be better for recombining is just doing something line by line
+ - and then ask the llm to fix it up
+
+mutation also seems silly, but then again that's part of the llm fixup
+
+maybe we just need better prompts, how can we guide the llm
+
+
+what we need is to assist the LLM in generating the best code from the start
+ - 
+
+possibly find other better LLMs for this task too
+ - using a quite old one at this point
+
+
+I think what we need to do is allow an LLM to loop many times
+ - to fix the code
+ - using a bunch of different test seeds
+ - or maybe even write this into a genetic algorithm
+ - basically just 
+
+but it's not just the prompt itself, it's also like, how concatenate all the info together
+ - almost like what we want is to make simple replacements
+ - but really, it's just simple code
+
+almost want to generate code to use for prompts
+
+
+also should reduce timing
+ - or measure max timing from each test (run multiple times for timing)
+ - then make it a multiple of the max (that's the timeout we use), like 10x
+ - ideally it ends up being really small, less than 5 seconds for our current tests
+
+
+lots more tests possibly?
+ - also don't have redundant tests
+ - like 1, 2, 3, 4, 5 and 5, 4, 3, 2, 1
+   - where the output is the same
+
+
+given a json object, generate a prompt in pure JS (sandboxed basically)
+
+then when we run that code, repeatedly
+
+maybe when you run the command, we get the active terminal
+
+
+I think one primary problem is that it's not easy for the AI to "hill climb"
+ - not enough tests
+
+hiding the tests (or having a layer of indirection)
+ - this will help to not just target a single test
+
+
+first, without seeing any code
+ - give the LLM the erroneous output and the expected output, and ask it what needs to happen to the output to fix it
+ - then do the same thing, but provide the code that generated the response, and ask how to fix that code
+ - after that, put both explanations along with the original code and last translation, and ask it to fix the issues
+
+
+should we penalize programs that crash / timeout?
+ - I mean, the output will be wrong anyways
+
+
+
+no ambiguous tests
+
+diff comparison of output - with some kind of feedback on 
+
+In a way, I think similiarty can be reated a few ways:
+ - allow LLM to rate it, I like this because it can do a little more reasoning (like both are lists of numbers)
+ - sentence similarity - a bit more predictable than an LLM, which sometimes can hallucinate
+ - length matching (just purely the length of the string)
+ - diff (will output nothing if it diffs)
+ - also should just do an exact direct compare (strcmp) first, since LLM might go unhinged and say two exact things aren't equal
+
+so we go through all the tests and sum it up (1 - result)
+ - since we measure failed tests
+ - maybe can change that from failed tests into test similarity (higher values, add all together)
+   - can also divide by number of tests to get a normalized number, just looks nice
+-------------------
+
+As a perfect example, I asked the most advanced version of GPT (4o currently) to do the translation
+the result was a fully compiling program, however the output was sometimes wrong
+
+this is amazing because it means if we improve the LLM (bigger model, more advanced model, bigger gpu, etc)
+ - then we should just get better results
+
+
+ok, lets get something we can run by tonight
+
 
 
 

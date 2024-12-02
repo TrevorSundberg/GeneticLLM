@@ -3,7 +3,6 @@ import fs from "node:fs";
 import { geneticPass } from "./genetic.js";
 import { CodeCandidate, geneticCodeConfig } from "./geneticCode.js";
 import { execFileSync } from "node:child_process";
-import * as llm from "node-llama-cpp";
 
 /*
 (async() => {
@@ -62,7 +61,7 @@ const execute = async (file: string, args: string[], options?: Execute): Promise
   console.log(file, args.join(" "), options ? `<<< ${options.stdin}` : "");
   try {
     return execFileSync(file, args, {
-      maxBuffer: 1024 * 10,
+      maxBuffer: 1024,
       encoding: "utf8",
       timeout: options?.timeout,
       stdio: "pipe",
@@ -107,13 +106,6 @@ const execute = async (file: string, args: string[], options?: Execute): Promise
 */
 
 (async () => {
-  const llama = await llm.getLlama({
-    logLevel: llm.LlamaLogLevel.disabled,
-  });
-  const model = await llama.loadModel({
-    modelPath: "./models/Nous-Hermes-2-Mistral-7B-DPO.Q4_0.gguf"
-    //modelPath: "./models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
-  });
 
   const stressTestCase = "34,5,1,95,-4, 5 , 21, -1234, 5, 99999, 1,0,5,3,9,1,1,1";
   const testCases = [
@@ -166,19 +158,16 @@ const execute = async (file: string, args: string[], options?: Execute): Promise
   };
 
   const runDest = async (input: string): Promise<string> => {
-    return execute("wasmtime /tmp/source.wat", { stdin: input, timeout: 10 * 1000 });
+    return execute("wasmtime /tmp/source.wat", { stdin: input, timeout: 5 * 1000 });
   };
   */
-
-  const grammar = await llama.createGrammar({
-    grammar: 'root ::= "#include" [^\\x00]*',
-  });
-
-  let prompting = false;
   
   const config = await geneticCodeConfig({
-    populationSize: 30,
-    language: "commented standard C with no libraries",
+    seed: 0,
+    populationSize: 2,
+    llmModelPath: "./models/Nous-Hermes-2-Mistral-7B-DPO.Q4_0.gguf", //"./models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
+    languageDescription: "commented standard C with no libraries",
+    languageGrammar: 'root ::= "#include" [^\\x00]*',
     sourceOrInstructions: await fs.promises.readFile("./clone.js", "utf8"),
     testInputs: testCases,
     runSample,
@@ -206,7 +195,7 @@ const execute = async (file: string, args: string[], options?: Execute): Promise
     },
 
     async runCompiled(candidate, input) {
-      const executeOpts: Execute = { stdin: input, timeout: 10 * 1000 };
+      const executeOpts: Execute = { stdin: input, timeout: 5 * 1000 };
       return execute("docker",
       [
         "run",
@@ -221,7 +210,7 @@ const execute = async (file: string, args: string[], options?: Execute): Promise
     },
 
     //async runCompiled(candidate, input) {
-    //  const executeOpts: Execute = { stdin: input, timeout: 10 * 1000 };
+    //  const executeOpts: Execute = { stdin: input, timeout: 5 * 1000 };
     //  const result = await execute(`docker run -v ./output:/output --rm silkeh/clang /output/${candidate.uniqueSeed}_compiled`, executeOpts);
     //  if (result.includes("Segmentation fault (core dumped)")) {
     //    return execute(`gdb -batch -q -ex run -ex bt --args /output/${candidate.uniqueSeed}_compiled`, executeOpts);
@@ -235,32 +224,6 @@ const execute = async (file: string, args: string[], options?: Execute): Promise
       for (let i = 0; i < 10; ++i) {
         await this.runCompiled(code, stressTestCase);
       }
-    },
-
-    async prompt(seed, prompt) {
-      if (prompting) {
-        throw new Error("CANNOT PROMPT TWICE");
-      }
-      prompting = true;
-      const context = await model.createContext();
-      const session = new llm.LlamaChatSession({
-        contextSequence: context.getSequence(),
-      });
-  
-      console.log("SEED:", seed, "PROMPT:", prompt);
-      const result = await session.prompt(prompt, {
-        temperature: 0.9,
-        seed,
-        grammar,
-        onTextChunk(text) {
-          process.stdout.write(text);
-        },
-      });
-      process.stdout.write("\n");
-      await session.dispose();
-      await context.dispose();
-      prompting = false;
-      return result;
     },
   });
 

@@ -48,7 +48,8 @@ export interface GeneticConfig<Candidate, Fitness>
   // Note that Fitness is not restricted to being a number, and can even be a structure
   // This is possible because we use rank based selection rather than weighted which requires a numeric fitness
   simulateAndMeasureFitness: (
-    candidate: Candidate
+    candidate: Candidate,
+    random: seedrandom.PRNG
   ) =>
     | Promise<MeasuredCandidate<Candidate, Fitness>>
     | MeasuredCandidate<Candidate, Fitness>;
@@ -87,7 +88,7 @@ export const geneticPass = async <Candidate, Fitness>(
 
   const measuredPopulation: MeasuredCandidate<Candidate, Fitness>[] = [];
   for (const candidate of population) {
-    measuredPopulation.push(await config.simulateAndMeasureFitness(candidate));
+    measuredPopulation.push(await config.simulateAndMeasureFitness(candidate, random));
   }
 
   // Sort fitness in ascending order for rank based selection
