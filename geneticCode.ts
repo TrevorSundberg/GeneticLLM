@@ -71,10 +71,10 @@ const cosineSimilarity = (vecA: Float32Array, vecB: Float32Array): number => {
   const magnitudeA = Math.sqrt(vecA.reduce((sum, val) => sum + val * val, 0));
   const magnitudeB = Math.sqrt(vecB.reduce((sum, val) => sum + val * val, 0));
   const result = dotProduct / (magnitudeA * magnitudeB);
-  if (isNaN(result)) {
-    return 0;
+  if (isFinite(result)) {
+    return Math.min(Math.max(result, 0), 1);
   }
-  return Math.min(Math.max(result, 0), 1);
+  return 0;
 }
 
 const getEmbedding = async(
