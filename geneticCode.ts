@@ -124,7 +124,7 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
     modelPath: config.llmModelPath,
   });
   const ratingGrammar = new llm.LlamaGrammar(llama, {
-    grammar: 'root ::= ([1-9] [1-9]? | "100") "\nReason: " [a-zA-Z ,.]+',
+    grammar: 'root ::= ([1-9] [1-9]? | "100") "\nReason: " [^\n]+',
   });
   const languageGrammar = config.languageGrammar
     ? new llm.LlamaGrammar(llama, { grammar: config.languageGrammar })
