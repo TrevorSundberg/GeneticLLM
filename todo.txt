@@ -229,9 +229,47 @@ the result was a fully compiling program, however the output was sometimes wrong
 this is amazing because it means if we improve the LLM (bigger model, more advanced model, bigger gpu, etc)
  - then we should just get better results
 
-
 ok, lets get something we can run by tonight
 
+DONE - add length calculations to the scoring too for the inputs
+DONE - more tests, non-ambiguous results
 
+side note, we could tokenize the test results and specifically penalize any mention of them
+ - even in normal prompting, not just in the reasoning
+ - that would guide the generated code away from directly hardcoding outputs...
 
+things to investigate:
+ - crossover (doesn't seem to be working well)
+ - mutation (also kinda eh)
+ - better LLM output with reasoning (given the original code, its translation, and the test error, ask it how to fix)
+ - we should maybe just have a limit to how many errors we show from the tests
+   - encapsulate all these settings, temperature, etc, in an object that we pass along with the model
+   - LLM configuration, sub config of the genetic thing
+   - it's basically an object that we ask everything to for building the prompts (just pass JSON, like all the failed tests)
+   - allow them to take their own options and configure it however they want
+
+I think we should categorize programs that crash
+ - and then programs that have all the same output regardless of tests
+ - if every test outputs the same thing (crash, etc)
+ - as long as it's not expected by the sample program
+
+basically just combining outputs
+ - any time we encounter an output that's the same, we combine it
+ - what if the sample was the same, what if it was different?
+ - we also at some point kind of want to show the input too,
+   to make sure it understands that it needs to target multiple inptus
+
+we want to penalize crashing and penalize outputs that are entirely the same (no variation, unless that's expected)
+ - maybe what we do is compare the sample outputs together to see similarity (e.g. remove duplicates, deduped/total)
+ - and if our result is lower than that, we're penalized
+ - that naturally penalizes crashes, timeouts, etc! I kinda like it!
+ - We should also gather all the sample outptus ahead of time since we're doing this change
+
+maybe we can measure diversity by the test outputs?
+ - would possibly need to be part of MeasuredCandidate (the test outputs)
+   - since we compare diversity N^2 between all candidates
+   - but only when breeding is it really needed
+
+I also want to run the LLM after mutation because when I think about it,
+it's a bit of an unfair advantage that the graduated candidates have, or even mutated candidates (since they ran the LLM)
 
