@@ -138,6 +138,9 @@ export const geneticPass = async <Candidate, Fitness>(
 
       // We already have a case for candidate graduation (neither a diverse injection nor a crossover/breed)
       // However, it's possible that breeding selects the same candidate, we allow this
+      // TODO(trevor): Just rewrite this so selectCandidate can take an index to exclude
+      // generate rand index one less than the total, and if it's >= the index we exclude, bump it up by one
+      // This always ensures we generate an index within the range that doesn't include that specific banned index
       if (measuredPopulation.length > 1) {
         while (candidateA === candidateB) {
           candidateB = selectCandidate();
