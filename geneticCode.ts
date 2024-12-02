@@ -391,26 +391,32 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
     },
 
     // For mutation for now we just go through character by character
-    mutate(candidate, mutationRate, random) {
-      let source = "";
+    async mutate(candidate, mutationRate, random) {
+      let mutatedSource = "";
 
       for (let i = 0; i < candidate.source.length; ++i) {
         if (random() < mutationRate) {
           const ASCII_PRINTABLE_START = 32;
           const ASCII_PRINTABLE_END = 126;
-          source += String.fromCharCode(
+          mutatedSource += String.fromCharCode(
             ASCII_PRINTABLE_START +
               (Math.abs(random.int32()) %
                 (ASCII_PRINTABLE_END - ASCII_PRINTABLE_START))
           );
         } else {
-          source += candidate.source[i];
+          mutatedSource += candidate.source[i];
         }
       }
       console.log("MUTATED FROM:");
       console.log(candidate.source);
       console.log("MUTATED TO:");
-      console.log(source);
+      console.log(mutatedSource);
+
+      const source = await prompt(
+        candidate.uniqueSeed,
+        `${sourceHeader}Mutated Translation:\n===\n${mutatedSource}\n---\nFix Issues. ${footer}`,
+        { grammar: languageGrammar }
+      );
 
       return {
         uniqueSeed: candidate.uniqueSeed,
