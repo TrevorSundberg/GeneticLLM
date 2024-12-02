@@ -112,7 +112,11 @@ const execute = async (file: string, args: string[], options?: Execute): Promise
     "5,3  ,9,1",
     "1",
     "1,2,3,4,5",
-    "5,4,3,2,1",
+    "4,3,2,1",
+    "   2,1   ",
+    "11, 22, 33, 44, 55, 66",
+    "-1, -2, -3, -4",
+    "9876    ,    9867,1234,5,4,3,2,1",
     stressTestCase,
   ]
   //const testCases = [
