@@ -169,6 +169,15 @@ const execute = async (
   };
   */
 
+  const cleanOutput = (candidate: CodeCandidate, output: string) => {
+    const sourceFile = `/output/${candidate.uniqueSeed}_source.c`;
+    const executableFile = `/output/${candidate.uniqueSeed}_compiled.wasm`;
+
+    return output
+      .replaceAll(sourceFile, "src.c")
+      .replaceAll(executableFile, "out.wasm");
+  };
+
   const config = await geneticCodeConfig({
     seed: 0,
     populationSize: 2,
@@ -198,12 +207,12 @@ const execute = async (
         "-o",
         `/output/${candidate.uniqueSeed}_compiled.wasm`,
       ]);
-      return output.replaceAll(sourceFile, "src.c");
+      return cleanOutput(candidate, output);
     },
 
     async runCompiled(candidate, input) {
       const executeOpts: Execute = { stdin: input, timeout: 5 * 1000 };
-      return execute(
+      const output = await execute(
         "docker",
         [
           "run",
@@ -217,6 +226,7 @@ const execute = async (
         ],
         executeOpts
       );
+      return cleanOutput(candidate, output);
     },
 
     //async runCompiled(candidate, input) {
