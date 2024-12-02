@@ -342,9 +342,46 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
 
     async crossoverBreed(a, b, random) {
       const uniqueSeed = newUniqueSeed(random);
+
+      const newlineRegex = /\r?\n/;
+      const aLines = a.source.split(newlineRegex);
+      const bLines = b.source.split(newlineRegex);
+
+      // Ensure we have at least one line in each to ensure we run at least one iteration below
+      if (aLines.length == 0) {
+        aLines.push("");
+      }
+      if (bLines.length == 0) {
+        bLines.push("");
+      }
+
+      // Combine lines from A and B
+      // If one is longer than the other, prefer to choose lines from the longer one more often
+      const combinedLines: string[] = [];
+      let aIndex = 0;
+      let bIndex = 0;
+      const totalLength = aLines.length + bLines.length;
+      const aProbability = aLines.length / totalLength;
+      while (aIndex < aLines.length && bIndex < bLines.length) {
+        const addLine = random() < 0.5;
+        if (random() < aProbability) {
+          if (addLine) {
+            combinedLines.push(aLines[aIndex]);
+          }
+          ++aIndex;
+        } else {
+          if (addLine) {
+            combinedLines.push(bLines[bIndex]);
+          }
+          ++bIndex;
+        }
+      }
+
+      const combined = combinedLines.join("\n");
+
       const source = await prompt(
         uniqueSeed,
-        `${sourceHeader}Translation A:\n===\n${a.source}\n---\nTranslation B:\n===\n${b.source}\n---\nCombine lines half from A and half from B. MUST use 50% of lines from each. ${footer}`,
+        `${sourceHeader}Combined Translation:\n===\n${combined}\n---\nFix Issues. ${footer}`,
         { grammar: languageGrammar }
       );
       return {
