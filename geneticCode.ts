@@ -113,14 +113,14 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
     modelPath: config.llmModelPath
   });
   const ratingGrammar = new llm.LlamaGrammar(llama, {
-    grammar: 'root ::= ([1-9] [1-9]? | "100") "\nReason: " [^\n]+'
+    grammar: 'root ::= ([1-9] [1-9]? | "100") "\nReason: " [a-zA-Z ,.]+'
   });
   const languageGrammar = config.languageGrammar
     ? new llm.LlamaGrammar(llama, { grammar: config.languageGrammar })
     : undefined;
 
   let prompting = false;
-  const prompt = async(seed: number, prompt: string, grammar: llm.LlamaGrammar | undefined) => {
+  const prompt = async(seed: number, prompt: string, options?: llm.LLamaChatPromptOptions) => {
     if (prompting) {
       throw new Error("CANNOT PROMPT TWICE");
     }
@@ -133,8 +133,8 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
     console.log("SEED:", seed, "PROMPT:", prompt);
     const result = await session.prompt(prompt, {
       temperature: 0.7,
+      ...options,
       seed,
-      grammar,
       onTextChunk(text) {
         process.stdout.write(text);
       },
@@ -173,7 +173,7 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
       const uniqueSeed = newUniqueSeed(random);
       return {
         uniqueSeed,
-        source: await prompt(uniqueSeed, `${sourceHeader}Translate this. ${footer}`, languageGrammar),
+        source: await prompt(uniqueSeed, `${sourceHeader}Translate this. ${footer}`, { grammar: languageGrammar }),
       };
     },
 
@@ -198,7 +198,7 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
           totalRunSeconds: 0,
         };
         if (compileErrors) {
-          newCandidate.source = await prompt(newCandidate.uniqueSeed, `${sourceHeader}Last Translation:\n===\n${newCandidate.source}\n---\nFix Issues:\n===\n${compileErrors}\n---\n${footer}`, languageGrammar);
+          newCandidate.source = await prompt(newCandidate.uniqueSeed, `${sourceHeader}Last Translation:\n===\n${newCandidate.source}\n---\nFix Issues:\n===\n${compileErrors}\n---\n${footer}`, { grammar: languageGrammar });
         } else {
           let promptText = `${sourceHeader}Last Translation:\n===\n${newCandidate.source}\n---\n`;
           // Shuffle the inputs so that the LLM won't get stuck on specific inputs
@@ -218,8 +218,12 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
               const compare = { expected: sampleResult, output: compiledResult };
               const ratingResult = await prompt(
                 newCandidate.uniqueSeed,
-                `${JSON.stringify(compare, null, 2)}\nRate similarity of expected and output, 1 = no similarity, 100 = exact match, (1-100): `,
-                ratingGrammar
+                `${JSON.stringify(compare, null, 2)}\nStrictly do NOT mention the values. Rate similarity of expected and output, 1 = no similarity, 100 = exact match, (1-100): `,
+                {
+                  grammar: ratingGrammar,
+                  temperature: 0.1,
+                  maxTokens: 1024
+                }
               );
               const [ratingStr, ratingReason] = ratingResult.split("\n");
               const rating = parseInt(ratingStr) / 100;
@@ -249,7 +253,7 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
 
           if (failedAnyTest) {
             promptText += `Fix Issues. ${footer}`;
-            newCandidate.source = await prompt(newCandidate.uniqueSeed, promptText, languageGrammar);
+            newCandidate.source = await prompt(newCandidate.uniqueSeed, promptText, { grammar: languageGrammar });
           } else {
             const startMs = performance.now();
             const perfResult = await config.testPerformance(newCandidate);
@@ -282,7 +286,7 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
     async crossoverBreed(a, b, random) {
       const uniqueSeed = newUniqueSeed(random);
       const source = await prompt(uniqueSeed,
-        `${sourceHeader}Translation A:\n===\n${a.source}\n---\nTranslation B:\n===\n${b.source}\n---\nCombine lines half from A and half from B. MUST use 50% of lines from each. ${footer}`, languageGrammar);
+        `${sourceHeader}Translation A:\n===\n${a.source}\n---\nTranslation B:\n===\n${b.source}\n---\nCombine lines half from A and half from B. MUST use 50% of lines from each. ${footer}`, { grammar: languageGrammar });
       return {
         uniqueSeed,
         source
