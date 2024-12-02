@@ -88,7 +88,9 @@ export const geneticPass = async <Candidate, Fitness>(
 
   const measuredPopulation: MeasuredCandidate<Candidate, Fitness>[] = [];
   for (const candidate of population) {
-    measuredPopulation.push(await config.simulateAndMeasureFitness(candidate, random));
+    measuredPopulation.push(
+      await config.simulateAndMeasureFitness(candidate, random)
+    );
   }
 
   // Sort fitness in ascending order for rank based selection

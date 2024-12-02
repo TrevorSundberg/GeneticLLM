@@ -1,5 +1,9 @@
 import seedrandom from "seedrandom";
-import { GeneticConfig, GeneticConfigTweakables, MeasuredCandidate } from "./genetic.js";
+import {
+  GeneticConfig,
+  GeneticConfigTweakables,
+  MeasuredCandidate,
+} from "./genetic.js";
 import { clone, defaulted, shuffle } from "./util.js";
 import * as llm from "node-llama-cpp";
 import * as transformers from "@huggingface/transformers";
@@ -25,7 +29,7 @@ export interface CodeFitness {
 export interface CodeError {
   line: number;
   message: string;
-};
+}
 
 // TODO(trevor): Right now we're only modeling simple programs with stdin/stdout, but eventually this should
 // effectively be a virtual environment where we can give it many types of inputs
@@ -39,7 +43,7 @@ export interface CodeGeneticConfig extends GeneticConfigTweakables {
 
   // Default is 3
   llmIterations?: number;
-  
+
   languageDescription: string;
 
   languageGrammar?: string;
@@ -51,19 +55,26 @@ export interface CodeGeneticConfig extends GeneticConfigTweakables {
   testInputs: CodeRuntimeInput[];
 
   // Run the sample that we wish to mimic it's input and output
-  // Note that if 
-  runSample: (input: CodeRuntimeInput) => Promise<CodeRuntimeOutput> | CodeRuntimeOutput;
+  // Note that if
+  runSample: (
+    input: CodeRuntimeInput
+  ) => Promise<CodeRuntimeOutput> | CodeRuntimeOutput;
 
   // Compile the code candidate, and output any compile errors
   compile: (code: CodeCandidate) => Promise<string> | string; // TODO(trevor): CodeError[]
 
   // Run the compiled code and retrieve it's output (or any runtime errors)
-  runCompiled: (code: CodeCandidate, input: CodeRuntimeInput) => Promise<CodeRuntimeOutput> | CodeRuntimeOutput;
+  runCompiled: (
+    code: CodeCandidate,
+    input: CodeRuntimeInput
+  ) => Promise<CodeRuntimeOutput> | CodeRuntimeOutput;
 
   // Test the performance of the compiled code (run a performance test)
   // Note that if this routine returns a number in seconds, we will use that as our performance number
   // Otherwise we will wrap this call with our own performance time sampling
-  testPerformance: (code: CodeCandidate) => Promise<number | void> | number | void;
+  testPerformance: (
+    code: CodeCandidate
+  ) => Promise<number | void> | number | void;
 }
 
 const cosineSimilarity = (vecA: Float32Array, vecB: Float32Array): number => {
@@ -75,9 +86,9 @@ const cosineSimilarity = (vecA: Float32Array, vecB: Float32Array): number => {
     return Math.min(Math.max(result, 0), 1);
   }
   return 0;
-}
+};
 
-const getEmbedding = async(
+const getEmbedding = async (
   sentence: string,
   featureExtractor: transformers.FeatureExtractionPipeline
 ): Promise<Float32Array> => {
@@ -86,7 +97,7 @@ const getEmbedding = async(
     normalize: true,
   });
   return embedding.data as Float32Array;
-}
+};
 
 export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
   const sourceHeader = `Original Source:\n===\n${config.sourceOrInstructions}\n---\n`;
@@ -97,30 +108,34 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
     path.join(process.cwd(), "./models/sentence-transformers_all-MiniLM-L6-v2")
   );
 
-  const compareStrings = async(
+  const compareStrings = async (
     str1: string,
     str2: string
   ): Promise<number> => {
     const embedding1 = await getEmbedding(str1, featureExtractor);
     const embedding2 = await getEmbedding(str2, featureExtractor);
     return cosineSimilarity(embedding1, embedding2);
-  }
+  };
 
   const llama = await llm.getLlama({
     logLevel: llm.LlamaLogLevel.disabled,
   });
   const model = await llama.loadModel({
-    modelPath: config.llmModelPath
+    modelPath: config.llmModelPath,
   });
   const ratingGrammar = new llm.LlamaGrammar(llama, {
-    grammar: 'root ::= ([1-9] [1-9]? | "100") "\nReason: " [a-zA-Z ,.]+'
+    grammar: 'root ::= ([1-9] [1-9]? | "100") "\nReason: " [a-zA-Z ,.]+',
   });
   const languageGrammar = config.languageGrammar
     ? new llm.LlamaGrammar(llama, { grammar: config.languageGrammar })
     : undefined;
 
   let prompting = false;
-  const prompt = async(seed: number, prompt: string, options?: llm.LLamaChatPromptOptions) => {
+  const prompt = async (
+    seed: number,
+    prompt: string,
+    options?: llm.LLamaChatPromptOptions
+  ) => {
     if (prompting) {
       throw new Error("CANNOT PROMPT TWICE");
     }
@@ -144,7 +159,7 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
     await context.dispose();
     prompting = false;
     return result;
-  }
+  };
 
   const compareFitness = (a: CodeFitness, b: CodeFitness): number => {
     if (b.compileErrors !== a.compileErrors) {
@@ -160,7 +175,7 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
 
     // Sort performance descending (larger performance time is worse)
     return b.totalRunSeconds - a.totalRunSeconds;
-  }
+  };
 
   // TODO(trevor): Actually verify this is unqiue, need to pass down the population
   // Note that the llama.cpp takes only positive integers (not decimals)
@@ -173,11 +188,18 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
       const uniqueSeed = newUniqueSeed(random);
       return {
         uniqueSeed,
-        source: await prompt(uniqueSeed, `${sourceHeader}Translate this. ${footer}`, { grammar: languageGrammar }),
+        source: await prompt(
+          uniqueSeed,
+          `${sourceHeader}Translate this. ${footer}`,
+          { grammar: languageGrammar }
+        ),
       };
     },
 
-    async simulateAndMeasureFitness(candidate, random): Promise<MeasuredCandidate<CodeCandidate, CodeFitness>> {
+    async simulateAndMeasureFitness(
+      candidate,
+      random
+    ): Promise<MeasuredCandidate<CodeCandidate, CodeFitness>> {
       console.log("BEGIN SIMULATE / MEASURE", candidate.uniqueSeed);
       const allAttempts: MeasuredCandidate<CodeCandidate, CodeFitness>[] = [];
 
@@ -198,7 +220,11 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
           totalRunSeconds: 0,
         };
         if (compileErrors) {
-          newCandidate.source = await prompt(newCandidate.uniqueSeed, `${sourceHeader}Last Translation:\n===\n${newCandidate.source}\n---\nFix Issues:\n===\n${compileErrors}\n---\n${footer}`, { grammar: languageGrammar });
+          newCandidate.source = await prompt(
+            newCandidate.uniqueSeed,
+            `${sourceHeader}Last Translation:\n===\n${newCandidate.source}\n---\nFix Issues:\n===\n${compileErrors}\n---\n${footer}`,
+            { grammar: languageGrammar }
+          );
         } else {
           let promptText = `${sourceHeader}Last Translation:\n===\n${newCandidate.source}\n---\n`;
           // Shuffle the inputs so that the LLM won't get stuck on specific inputs
@@ -206,23 +232,33 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
           let failedAnyTest = false;
           for (const testInput of testInputsShuffled) {
             const sampleResult = await config.runSample(testInput);
-            const compiledResult = await config.runCompiled(newCandidate, testInput);
+            const compiledResult = await config.runCompiled(
+              newCandidate,
+              testInput
+            );
             if (sampleResult === compiledResult) {
               ++fitness.passedTests;
             } else {
               failedAnyTest = true;
-              
+
               // Asking the LLM for a comparison is great because it can do slightly more in depth analysis
               // and discover similar patterns between them (meaning the translation can be on the right track)
               // However the LLM can tend to occasionally hallucinate, so we also use sentence similarity
-              const compare = { expected: sampleResult, output: compiledResult };
+              const compare = {
+                expected: sampleResult,
+                output: compiledResult,
+              };
               const ratingResult = await prompt(
                 newCandidate.uniqueSeed,
-                `${JSON.stringify(compare, null, 2)}\nStrictly do NOT mention the values. Rate similarity of expected and output, 1 = no similarity, 100 = exact match, (1-100): `,
+                `${JSON.stringify(
+                  compare,
+                  null,
+                  2
+                )}\nStrictly do NOT mention the values. Rate similarity of expected and output, 1 = no similarity, 100 = exact match, (1-100): `,
                 {
                   grammar: ratingGrammar,
                   temperature: 0.1,
-                  maxTokens: 1024
+                  maxTokens: 1024,
                 }
               );
               const [ratingStr, ratingReason] = ratingResult.split("\n");
@@ -232,41 +268,62 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
               // This also works really well for comparing the meanings of outputs
               // However we observed that inputs such as "1" and "1, 2, 3, 4, 5" will result in a high match
               // Because of this, we also do the length comparison below
-              const similarity = await compareStrings(sampleResult, compiledResult);
+              const similarity = await compareStrings(
+                sampleResult,
+                compiledResult
+              );
 
               // Results in a value between [0, 1]
               // We always take the length of the smaller string divided by the length of the larger
               // to see how far off the true length we are (1 means they are the same)
-              const lengthResult = sampleResult.length < compiledResult.length
-                ? sampleResult.length / compiledResult.length
-                : compiledResult.length / sampleResult.length;
+              const lengthResult =
+                sampleResult.length < compiledResult.length
+                  ? sampleResult.length / compiledResult.length
+                  : compiledResult.length / sampleResult.length;
               const lengthCompare = isFinite(lengthResult) ? lengthResult : 0.0;
 
               // We don't ever allow the combined to be 1, as it should never be exactly the same as a passed test
-              const combined = Math.min((rating + similarity + lengthCompare) / 3, 0.999999);
-              console.log("rating", rating, "similarity", similarity, "lengthCompare", lengthCompare, "combined", combined);
+              const combined = Math.min(
+                (rating + similarity + lengthCompare) / 3,
+                0.999999
+              );
+              console.log(
+                "rating",
+                rating,
+                "similarity",
+                similarity,
+                "lengthCompare",
+                lengthCompare,
+                "combined",
+                combined
+              );
               fitness.passedTests += combined;
-              
+
               promptText += `Erroneous Stdout:\n===\n${compiledResult}\n---\nExpected Stdout:\n===\n${sampleResult}\n---\n${ratingReason}\n###\n`;
             }
           }
 
           if (failedAnyTest) {
             promptText += `Fix Issues. ${footer}`;
-            newCandidate.source = await prompt(newCandidate.uniqueSeed, promptText, { grammar: languageGrammar });
+            newCandidate.source = await prompt(
+              newCandidate.uniqueSeed,
+              promptText,
+              { grammar: languageGrammar }
+            );
           } else {
             const startMs = performance.now();
             const perfResult = await config.testPerformance(newCandidate);
             const endMs = performance.now();
-            fitness.totalRunSeconds = typeof perfResult === "number"
-              ? perfResult
-              : (endMs - startMs) / 1000;
+            fitness.totalRunSeconds =
+              typeof perfResult === "number"
+                ? perfResult
+                : (endMs - startMs) / 1000;
           }
         }
 
         console.log("FITNESS:", JSON.stringify(fitness, null, 2));
         allAttempts.push({ candidate: newCandidate, fitness });
-       }
+      }
 
       // Sort fitness in ascending order for rank based selection
       allAttempts.sort((a, b) => compareFitness(a.fitness, b.fitness));
@@ -276,45 +333,51 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
       const best = allAttempts[allAttempts.length - 1];
 
       console.log("BEST:", JSON.stringify(best, null, 2));
-      
+
       console.log("END", candidate.uniqueSeed);
       return best;
     },
-  
+
     compareFitness,
 
     async crossoverBreed(a, b, random) {
       const uniqueSeed = newUniqueSeed(random);
-      const source = await prompt(uniqueSeed,
-        `${sourceHeader}Translation A:\n===\n${a.source}\n---\nTranslation B:\n===\n${b.source}\n---\nCombine lines half from A and half from B. MUST use 50% of lines from each. ${footer}`, { grammar: languageGrammar });
+      const source = await prompt(
+        uniqueSeed,
+        `${sourceHeader}Translation A:\n===\n${a.source}\n---\nTranslation B:\n===\n${b.source}\n---\nCombine lines half from A and half from B. MUST use 50% of lines from each. ${footer}`,
+        { grammar: languageGrammar }
+      );
       return {
         uniqueSeed,
-        source
+        source,
       };
     },
 
     // For mutation for now we just go through character by character
     mutate(candidate, mutationRate, random) {
-      let source = '';
+      let source = "";
 
       for (let i = 0; i < candidate.source.length; ++i) {
         if (random() < mutationRate) {
           const ASCII_PRINTABLE_START = 32;
           const ASCII_PRINTABLE_END = 126;
-          source += String.fromCharCode(ASCII_PRINTABLE_START +
-            (Math.abs(random.int32()) % (ASCII_PRINTABLE_END - ASCII_PRINTABLE_START)));
+          source += String.fromCharCode(
+            ASCII_PRINTABLE_START +
+              (Math.abs(random.int32()) %
+                (ASCII_PRINTABLE_END - ASCII_PRINTABLE_START))
+          );
         } else {
           source += candidate.source[i];
         }
       }
-      console.log("MUTATED FROM:")
+      console.log("MUTATED FROM:");
       console.log(candidate.source);
-      console.log("MUTATED TO:")
+      console.log("MUTATED TO:");
       console.log(source);
 
       return {
         uniqueSeed: candidate.uniqueSeed,
-        source
+        source,
       };
     },
   };

@@ -1,4 +1,3 @@
-import process from "node:process";
 import fs from "node:fs";
 import { geneticPass } from "./genetic.js";
 import { CodeCandidate, geneticCodeConfig } from "./geneticCode.js";
@@ -57,7 +56,11 @@ interface Execute {
 }
 
 // // Not technically asnyc, but doing this to keep our options open
-const execute = async (file: string, args: string[], options?: Execute): Promise<string> => {
+const execute = async (
+  file: string,
+  args: string[],
+  options?: Execute
+): Promise<string> => {
   console.log(file, args.join(" "), options ? `<<< ${options.stdin}` : "");
   try {
     return execFileSync(file, args, {
@@ -65,15 +68,15 @@ const execute = async (file: string, args: string[], options?: Execute): Promise
       encoding: "utf8",
       timeout: options?.timeout,
       stdio: "pipe",
-      input: options?.stdin
+      input: options?.stdin,
     });
   } catch (err: any) {
     console.log(err);
     const out = [err.stderr, err.stdout].join("\n");
-    if (err.code === 'ENOBUFS') {
+    if (err.code === "ENOBUFS") {
       return `Failed stdout too large:\n${out}`;
     }
-    if (err.code === 'ETIMEDOUT') {
+    if (err.code === "ETIMEDOUT") {
       return `Failed timed out:\n${out}`;
     }
     if (err.status) {
@@ -106,8 +109,8 @@ const execute = async (file: string, args: string[], options?: Execute): Promise
 */
 
 (async () => {
-
-  const stressTestCase = "34,5,1,95,-4, 5 , 21, -1234, 5, 99999, 1,0,5,3,9,1,1,1";
+  const stressTestCase =
+    "34,5,1,95,-4, 5 , 21, -1234, 5, 99999, 1,0,5,3,9,1,1,1";
   const testCases = [
     "5,3  ,9,1",
     "1",
@@ -118,7 +121,7 @@ const execute = async (file: string, args: string[], options?: Execute): Promise
     "-1, -2, -3, -4",
     "9876    ,    9867,1234,5,4,3,2,1",
     stressTestCase,
-  ]
+  ];
   //const testCases = [
   //  '{}',
   //  '{"foo": "bar"}',
@@ -165,7 +168,7 @@ const execute = async (file: string, args: string[], options?: Execute): Promise
     return execute("wasmtime /tmp/source.wat", { stdin: input, timeout: 5 * 1000 });
   };
   */
-  
+
   const config = await geneticCodeConfig({
     seed: 0,
     populationSize: 2,
@@ -178,7 +181,7 @@ const execute = async (file: string, args: string[], options?: Execute): Promise
 
     async compile(candidate) {
       const sourceFile = `/output/${candidate.uniqueSeed}_source.c`;
-      await fs.promises.mkdir("output", {recursive: true});
+      await fs.promises.mkdir("output", { recursive: true });
       await fs.promises.writeFile(`.${sourceFile}`, candidate.source);
       const output = await execute("docker", [
         "run",
@@ -193,24 +196,27 @@ const execute = async (file: string, args: string[], options?: Execute): Promise
         "-g3",
         sourceFile,
         "-o",
-        `/output/${candidate.uniqueSeed}_compiled.wasm`
+        `/output/${candidate.uniqueSeed}_compiled.wasm`,
       ]);
       return output.replaceAll(sourceFile, "src.c");
     },
 
     async runCompiled(candidate, input) {
       const executeOpts: Execute = { stdin: input, timeout: 5 * 1000 };
-      return execute("docker",
-      [
-        "run",
-        "-i",
-        "-v",
-        "./output:/output",
-        "--rm",
-        "genetic_llm/clang",
-        "wasmtime",
-        `/output/${candidate.uniqueSeed}_compiled.wasm`
-      ], executeOpts);
+      return execute(
+        "docker",
+        [
+          "run",
+          "-i",
+          "-v",
+          "./output:/output",
+          "--rm",
+          "genetic_llm/clang",
+          "wasmtime",
+          `/output/${candidate.uniqueSeed}_compiled.wasm`,
+        ],
+        executeOpts
+      );
     },
 
     //async runCompiled(candidate, input) {
