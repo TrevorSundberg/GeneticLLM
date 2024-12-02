@@ -99,9 +99,23 @@ const getEmbedding = async (
   return embedding.data as Float32Array;
 };
 
+interface TestResult {
+  input: CodeRuntimeInput;
+  output: CodeRuntimeOutput;
+}
+
 export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
   const sourceHeader = `Original Source:\n===\n${config.sourceOrInstructions}\n---\n`;
   const footer = `Strictly output ONLY safe ${config.languageDescription}, no surrounding explanations, no examples, no hard-coded test-inputs, nothing else:`;
+
+  const testSamples: TestResult[] = [];
+  for (const testInput of config.testInputs) {
+    const output = await config.runSample(testInput);
+    testSamples.push({
+      input: testInput,
+      output
+    });
+  }
 
   const featureExtractor = await transformers.pipeline(
     "feature-extraction",
@@ -228,13 +242,13 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
         } else {
           let promptText = `${sourceHeader}Last Translation:\n===\n${newCandidate.source}\n---\n`;
           // Shuffle the inputs so that the LLM won't get stuck on specific inputs
-          const testInputsShuffled = shuffle([...config.testInputs], random);
+          const testSamplesShuffled = shuffle([...testSamples], random);
           let failedAnyTest = false;
-          for (const testInput of testInputsShuffled) {
-            const sampleResult = await config.runSample(testInput);
+          for (const testSample of testSamplesShuffled) {
+            const sampleResult = testSample.output;
             const compiledResult = await config.runCompiled(
               newCandidate,
-              testInput
+              testSample.input
             );
             if (sampleResult === compiledResult) {
               ++fitness.passedTests;
