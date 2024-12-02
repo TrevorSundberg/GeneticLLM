@@ -1,8 +1,9 @@
 import process from "node:process";
 import fs from "node:fs";
-import { geneticPass } from "./genetic";
-import { CodeCandidate, geneticCodeConfig } from "./geneticCode";
+import { geneticPass } from "./genetic.js";
+import { CodeCandidate, geneticCodeConfig } from "./geneticCode.js";
 import { execFileSync } from "node:child_process";
+import * as llm from "node-llama-cpp";
 
 /*
 (async() => {
@@ -106,7 +107,6 @@ const execute = async (file: string, args: string[], options?: Execute): Promise
 */
 
 (async () => {
-  const llm = await import("node-llama-cpp");
   const llama = await llm.getLlama({
     logLevel: llm.LlamaLogLevel.disabled,
   });

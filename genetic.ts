@@ -1,5 +1,5 @@
 import seedrandom from "seedrandom";
-import { defaulted } from "./util";
+import { defaulted } from "./util.js";
 
 export interface GeneticConfigTweakables {
   // The number of candidates (solutions, indviduals, chromosomes, etc.) in each generation

@@ -1,6 +1,6 @@
 import seedrandom from "seedrandom";
-import { GeneticConfig, GeneticConfigTweakables, MeasuredCandidate } from "./genetic";
-import { clone, defaulted, shuffle } from "./util";
+import { GeneticConfig, GeneticConfigTweakables, MeasuredCandidate } from "./genetic.js";
+import { clone, defaulted, shuffle } from "./util.js";
 
 // TODO(trevor): Eventually this should become a virtual fileystem with multiple files
 export type CodeSource = string;
