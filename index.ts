@@ -61,7 +61,9 @@ const execute = async (
   args: string[],
   options?: Execute
 ): Promise<string> => {
-  console.log(file, args.join(" "), options ? `<<< ${options.stdin}` : "");
+  console.log(file, args.join(" "), options ? `<<< ${JSON.stringify(options.stdin)}` : "");
+
+  let result: string | undefined = undefined;
   try {
     return execFileSync(file, args, {
       maxBuffer: 1024,
