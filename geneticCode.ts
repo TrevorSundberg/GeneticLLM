@@ -108,6 +108,7 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
   const sourceHeader = `Original Source:\n===\n${config.sourceOrInstructions}\n---\n`;
   const footer = `Strictly output ONLY safe ${config.languageDescription}, no surrounding explanations, no examples, no hard-coded test-inputs, nothing else:`;
 
+  const uniqueTestOutputs = new Set<string>();
   const testSamples: TestResult[] = [];
   for (const testInput of config.testInputs) {
     const output = await config.runSample(testInput);
@@ -115,7 +116,13 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
       input: testInput,
       output
     });
+
+    // Note we stringify output in case we change the representation of CodeRuntimeOutput
+    uniqueTestOutputs.add(JSON.stringify(output));
   }
+
+  const uniqueTestOutputPercent = uniqueTestOutputs.size / testSamples.length;
+  console.log("uniqueTestOutputPercent", uniqueTestOutputPercent);
 
   const featureExtractor = await transformers.pipeline(
     "feature-extraction",
