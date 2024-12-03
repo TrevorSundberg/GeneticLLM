@@ -22,6 +22,7 @@ export interface CodeCandidate {
 
 export interface CodeFitness {
   compileErrors: number;
+  uniqueTestResults: number;
   passedTests: number;
   totalRunSeconds: number;
 }
@@ -101,11 +102,16 @@ interface TestResult {
   output: CodeRuntimeOutput;
 }
 
+const addUniqueTestResult = (set: Set<string>, output: CodeRuntimeOutput) => {
+  // Note we stringify output in case we change the representation of CodeRuntimeOutput
+  set.add(JSON.stringify(output));
+}
+
 export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
   const sourceHeader = `Original Source:\n===\n${config.sourceOrInstructions}\n---\n`;
   const footer = `Strictly output ONLY safe ${config.languageDescription}, no surrounding explanations, no examples, no hard-coded test-inputs, nothing else:`;
 
-  const uniqueTestOutputs = new Set<string>();
+  const uniqueSampleTestOutputs = new Set<string>();
   const testSamples: TestResult[] = [];
   for (const testInput of config.testInputs) {
     const output = await config.runSample(testInput);
@@ -114,12 +120,11 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
       output
     });
 
-    // Note we stringify output in case we change the representation of CodeRuntimeOutput
-    uniqueTestOutputs.add(JSON.stringify(output));
+    addUniqueTestResult(uniqueSampleTestOutputs, output);
   }
 
-  const uniqueTestOutputPercent = uniqueTestOutputs.size / testSamples.length;
-  console.log("uniqueTestOutputPercent", uniqueTestOutputPercent);
+  const uniqueSampleTestOutputFraction = uniqueSampleTestOutputs.size / testSamples.length;
+  console.log("uniqueSampleTestOutputFraction", uniqueSampleTestOutputFraction);
 
   const featureExtractor = await transformers.pipeline(
     "feature-extraction",
@@ -185,6 +190,11 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
       return b.compileErrors - a.compileErrors;
     }
 
+    if (b.uniqueTestResults !== a.uniqueTestResults) {
+      // Sort unique test results ascending (larger amount up to the uniqueTestOutputFraction is better)
+      return a.uniqueTestResults - b.uniqueTestResults;
+    }
+
     if (b.passedTests !== a.passedTests) {
       // Sort passed tests ascending (larger amount of passed tests is better)
       // Note that passedTests is not an integer (can be a float value)
@@ -234,6 +244,7 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
 
         const fitness: CodeFitness = {
           compileErrors: compileErrors.length,
+          uniqueTestResults: 0,
           passedTests: 0,
           totalRunSeconds: 0,
         };
@@ -248,12 +259,16 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
           // Shuffle the inputs so that the LLM won't get stuck on specific inputs
           const testSamplesShuffled = shuffle([...testSamples], random);
           let failedAnyTest = false;
+          const uniqueCompiledTestOutputs = new Set<string>();
           for (const testSample of testSamplesShuffled) {
             const sampleResult = testSample.output;
             const compiledResult = await config.runCompiled(
               newCandidate,
               testSample.input
             );
+
+            addUniqueTestResult(uniqueCompiledTestOutputs, compiledResult);
+
             if (sampleResult === compiledResult) {
               ++fitness.passedTests;
             } else {
@@ -320,6 +335,14 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
               promptText += `Erroneous Stdout:\n===\n${compiledResult}\n---\nExpected Stdout:\n===\n${sampleResult}\n---\n${ratingReason}\n###\n`;
             }
           }
+
+          // We want to see how many of the tests resulted in a unique output
+          // This is because it's common to have programs that crash, time out, or always output the same thing ignoring inputs
+          // We want to penalize these programs over running working programs that produce varied outputs
+          const uniqueCompiledTestOutputFraction = uniqueCompiledTestOutputs.size / testSamplesShuffled.length;
+          console.log("uniqueCompiledTestOutputFraction", uniqueCompiledTestOutputFraction);
+          fitness.uniqueTestResults = saturate(uniqueCompiledTestOutputFraction / uniqueSampleTestOutputFraction);
+          console.log("uniqueTestResults", fitness.uniqueTestResults);
 
           if (failedAnyTest) {
             promptText += `Fix Issues. ${footer}`;
