@@ -169,7 +169,7 @@ const execute = async (
   };
 
   const runDest = async (input: string): Promise<string> => {
-    return execute("wasmtime /tmp/source.wat", { stdin: input, timeout: 5 * 1000 });
+    return execute("wasmtime /tmp/source.wat", { stdin: input, timeout: 3 * 1000 });
   };
   */
 
@@ -215,7 +215,7 @@ const execute = async (
     },
 
     async runCompiled(candidate, input) {
-      const executeOpts: Execute = { stdin: input, timeout: 5 * 1000 };
+      const executeOpts: Execute = { stdin: input, timeout: 3 * 1000 };
       const output = await execute(
         "docker",
         [
@@ -234,7 +234,7 @@ const execute = async (
     },
 
     //async runCompiled(candidate, input) {
-    //  const executeOpts: Execute = { stdin: input, timeout: 5 * 1000 };
+    //  const executeOpts: Execute = { stdin: input, timeout: 3 * 1000 };
     //  const result = await execute(`docker run -v ./output:/output --rm silkeh/clang /output/${candidate.uniqueSeed}_compiled`, executeOpts);
     //  if (result.includes("Segmentation fault (core dumped)")) {
     //    return execute(`gdb -batch -q -ex run -ex bt --args /output/${candidate.uniqueSeed}_compiled`, executeOpts);
