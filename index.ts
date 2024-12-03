@@ -63,10 +63,12 @@ const execute = async (
 ): Promise<string> => {
   console.log(file, args.join(" "), options ? `<<< ${JSON.stringify(options.stdin)}` : "");
 
+  // Tweaked for the exact problem we're solving
+  const maxBuffer = 1024;
   let result: string | undefined = undefined;
   try {
     return execFileSync(file, args, {
-      maxBuffer: 1024,
+      maxBuffer: maxBuffer,
       encoding: "utf8",
       timeout: options?.timeout,
       stdio: "pipe",
@@ -74,7 +76,7 @@ const execute = async (
     });
   } catch (err: any) {
     console.log(err);
-    const out = [err.stderr, err.stdout].join("\n");
+    const out = (err.stderr + (err.stderr ? "\n" : "") + err.stdout).substring(0, maxBuffer);
     if (err.code === "ENOBUFS") {
       return `Failed stdout too large:\n${out}`;
     }
