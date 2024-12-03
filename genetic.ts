@@ -1,5 +1,5 @@
 import seedrandom from "seedrandom";
-import { defaulted } from "./util.js";
+import { defaulted, saturate } from "./util.js";
 
 export interface GeneticConfigTweakables {
   // The number of candidates (solutions, indviduals, chromosomes, etc.) in each generation
@@ -98,7 +98,7 @@ export const geneticPass = async <Candidate, Fitness>(
     config.compareFitness(a.fitness, b.fitness)
   );
 
-  const elitism = Math.max(defaulted(config.elitism, 0.35), 0);
+  const elitism = saturate(defaulted(config.elitism, 0.35));
 
   const selectCandidate = () =>
     measuredPopulation[

@@ -4,7 +4,7 @@ import {
   GeneticConfigTweakables,
   MeasuredCandidate,
 } from "./genetic.js";
-import { clone, defaulted, shuffle } from "./util.js";
+import { clone, defaulted, saturate, shuffle } from "./util.js";
 import * as llm from "node-llama-cpp";
 import * as transformers from "@huggingface/transformers";
 import path from "node:path";
@@ -82,10 +82,7 @@ const cosineSimilarity = (vecA: Float32Array, vecB: Float32Array): number => {
   const magnitudeA = Math.sqrt(vecA.reduce((sum, val) => sum + val * val, 0));
   const magnitudeB = Math.sqrt(vecB.reduce((sum, val) => sum + val * val, 0));
   const result = dotProduct / (magnitudeA * magnitudeB);
-  if (isFinite(result)) {
-    return Math.min(Math.max(result, 0), 1);
-  }
-  return 0;
+  return saturate(result);
 };
 
 const getEmbedding = async (

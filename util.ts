@@ -10,3 +10,18 @@ export const shuffle = <T>(array: T[], random: () => number): T[] => {
   }
   return array;
 }
+
+export const clamp = (value: number, min: number, max: number) => {
+  if (isNaN(value)) {
+    return min;
+  }
+  if (value < min) {
+    return min;
+  }
+  if (value > max) {
+    return max;
+  }
+  return value;
+};
+
+export const saturate = (value: number) => clamp(value, 0, 1);
