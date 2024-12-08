@@ -239,8 +239,9 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
       let newCandidate = candidate;
       const llmIterations = Math.max(defaulted(config.llmIterations, 5), 1);
       for (let attempt = 0; attempt < llmIterations; ++attempt) {
+        const currentCandidate = newCandidate;
         newCandidate = clone(newCandidate);
-        const compileErrors = await config.compile(newCandidate);
+        const compileErrors = await config.compile(currentCandidate);
 
         const fitness: CodeFitness = {
           compileErrors: compileErrors.length,
@@ -250,12 +251,12 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
         };
         if (compileErrors) {
           newCandidate.source = await prompt(
-            newCandidate.uniqueSeed,
-            `${sourceHeader}Last Translation:\n===\n${newCandidate.source}\n---\nFix Issues:\n===\n${compileErrors}\n---\n${footer}`,
+            currentCandidate.uniqueSeed,
+            `${sourceHeader}Last Translation:\n===\n${currentCandidate.source}\n---\nFix Issues:\n===\n${compileErrors}\n---\n${footer}`,
             { grammar: languageGrammar }
           );
         } else {
-          let promptText = `${sourceHeader}Last Translation:\n===\n${newCandidate.source}\n---\n`;
+          let promptText = `${sourceHeader}Last Translation:\n===\n${currentCandidate.source}\n---\n`;
           // Shuffle the inputs so that the LLM won't get stuck on specific inputs
           const testSamplesShuffled = shuffle([...testSamples], random);
           let failedAnyTest = false;
@@ -263,7 +264,7 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
           for (const testSample of testSamplesShuffled) {
             const sampleResult = testSample.output;
             const compiledResult = await config.runCompiled(
-              newCandidate,
+              currentCandidate,
               testSample.input
             );
 
@@ -282,7 +283,7 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
                 output: compiledResult,
               };
               const ratingResult = await prompt(
-                newCandidate.uniqueSeed,
+                currentCandidate.uniqueSeed,
                 `${JSON.stringify(
                   compare,
                   null,
@@ -347,13 +348,13 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
           if (failedAnyTest) {
             promptText += `Fix Issues. ${footer}`;
             newCandidate.source = await prompt(
-              newCandidate.uniqueSeed,
+              currentCandidate.uniqueSeed,
               promptText,
               { grammar: languageGrammar }
             );
           } else {
             const startMs = performance.now();
-            const perfResult = await config.testPerformance(newCandidate);
+            const perfResult = await config.testPerformance(currentCandidate);
             const endMs = performance.now();
             fitness.totalRunSeconds =
               typeof perfResult === "number"
@@ -363,7 +364,7 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
         }
 
         console.log("FITNESS:", JSON.stringify(fitness, null, 2));
-        allAttempts.push({ candidate: newCandidate, fitness });
+        allAttempts.push({ candidate: currentCandidate, fitness });
       }
 
       // Sort fitness in ascending order for rank based selection
