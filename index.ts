@@ -185,7 +185,8 @@ const execute = async (
   const config = await geneticCodeConfig({
     seed: 0,
     populationSize: 2,
-    llmModelPath: "./models/Nous-Hermes-2-Mistral-7B-DPO.Q4_0.gguf", //"./models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
+    llmModelPath: "./models/Nous-Hermes-2-Mistral-7B-DPO.Q4_0.gguf",
+    //llmModelPath: "./models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
     languageDescription: "commented standard C with no libraries",
     languageGrammar: 'root ::= "#include" [^\\x00]*',
     sourceOrInstructions: await fs.promises.readFile("./clone.js", "utf8"),
@@ -250,6 +251,50 @@ const execute = async (
       }
     },
   });
+/*
+  await config.crossoverBreed({
+    uniqueSeed: 0,
+    source:
+`
+#include <stdio.h>
+
+int main() {
+    int num1 = 0, num2 = 0;
+    scanf("%d %d", &num1, &num2);
+
+    if (num1 && num2) {
+        int result = num1 + num2;
+        printf("The result is: %d\\n", result);
+    } else {
+        printf("Please provide two numbers.\\n");
+    }
+
+    return 0;
+}
+`
+  }, {
+    uniqueSeed: 0,
+    source:
+`
+#include <stdio.h>
+
+int main() {
+    int num1 = 0, num2 = 0;
+    scanf("%d %d", &num1, &num2);
+
+    if (num1 && num2) {
+        int result = num1 + num2;
+        printf("The result is: %d\\n", result);
+    } else {
+        printf("Please provide two numbers.\\n");
+    }
+
+    return 0;
+}
+`
+  }, seedrandom("0"));
+
+return;*/
 
   let population: CodeCandidate[] = [];
   for (let i = 0; i < 30; ++i) {
