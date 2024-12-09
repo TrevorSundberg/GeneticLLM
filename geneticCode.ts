@@ -146,8 +146,9 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
   const model = await llama.loadModel({
     modelPath: config.llmModelPath,
   });
+  const ratingExplain = "Explain what must be fixed for output to match expected: ";
   const ratingGrammar = new llm.LlamaGrammar(llama, {
-    grammar: 'root ::= ([1-9] [0-9]? | "100") "\nReason: " [^\n]+',
+    grammar: `root ::= ([1-9] [0-9]? | "100") "\n${ratingExplain}" [^\n]+`,
   });
   const languageGrammar = config.languageGrammar
     ? new llm.LlamaGrammar(llama, { grammar: config.languageGrammar })
@@ -288,15 +289,16 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
                   compare,
                   null,
                   2
-                )}\nStrictly do NOT mention the values. Rate similarity of expected and output, 1 = no similarity, 100 = exact match, (1-100): `,
+                )}\nStrictly do NOT mention the values, quotes, or any examples. The expected and output are NOT equal. Rate similarity of expected and output, 1 = no similarity, 100 = exact match, (1-100): `,
                 {
                   grammar: ratingGrammar,
                   temperature: 0.1,
                   maxTokens: 1024,
                 }
               );
-              const [ratingStr, ratingReason] = ratingResult.split("\n");
+              const [ratingStr, ratingReasonFull] = ratingResult.split("\n");
               const rating = parseInt(ratingStr) / 100;
+              const ratingReason = ratingReasonFull.substring(ratingExplain.length);
 
               // Sentence similarity to compare the outputs
               // This also works really well for comparing the meanings of outputs
