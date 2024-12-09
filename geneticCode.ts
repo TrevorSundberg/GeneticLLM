@@ -42,7 +42,7 @@ export type CodeRuntimeOutput = string;
 export interface CodeGeneticConfig extends GeneticConfigTweakables {
   llmModelPath: string;
 
-  // Default is 5
+  // Default is 3
   llmIterations?: number;
 
   languageDescription: string;
@@ -237,7 +237,7 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
       // but I think the idea would be to actually do less iterations, as iterations get smaller choosing the best is not as selective
       // Should it be the best attempt, or just the end attempt?
       let newCandidate = candidate;
-      const llmIterations = Math.max(defaulted(config.llmIterations, 5), 1);
+      const llmIterations = Math.max(defaulted(config.llmIterations, 3), 1);
       for (let attempt = 0; attempt < llmIterations; ++attempt) {
         const currentCandidate = newCandidate;
         newCandidate = clone(newCandidate);
