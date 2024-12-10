@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import { geneticPass } from "./genetic.js";
-import { CodeCandidate, geneticCodeConfig } from "./geneticCode.js";
+import { CodeCandidate, geneticCodeConfig, getLlama } from "./geneticCode.js";
 import { execFileSync } from "node:child_process";
 
 /*
@@ -182,14 +182,24 @@ const execute = async (
       .replaceAll(executableFile, "out.wasm");
   };
 
+  const llama = await getLlama();
+  const languageDescription = "commented standard C with no libraries";
+  const source = await fs.promises.readFile("./clone.js", "utf8");
+  const sourceHeader = `Original Source:\n===\n${source}\n---\n`;
+  const footer = `Strictly output ONLY safe ${languageDescription}, no surrounding explanations, no examples, no hard-coded test-inputs, nothing else:`;
+  const languageGrammar = await llama.createGrammar({
+    grammar: 'root ::= "#include" [^\\x00]*'
+  });
+  const ratingExplain = "Explain what must be fixed for output to match expected: ";
+  const ratingGrammar = await llama.createGrammar({
+    grammar: `root ::= ([1-9] [0-9]? | "100") "\n${ratingExplain}" [^\n]+`,
+  });
+
   const config = await geneticCodeConfig({
     seed: 0,
     populationSize: 2,
     llmModelPath: "./models/Nous-Hermes-2-Mistral-7B-DPO.Q4_0.gguf",
     //llmModelPath: "./models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
-    languageDescription: "commented standard C with no libraries",
-    languageGrammar: 'root ::= "#include" [^\\x00]*',
-    sourceOrInstructions: await fs.promises.readFile("./clone.js", "utf8"),
     testInputs: testCases,
     runSample,
 
@@ -249,6 +259,68 @@ const execute = async (
       for (let i = 0; i < 10; ++i) {
         await this.runCompiled(code, stressTestCase);
       }
+    },
+
+    promptRandomCandidate(prompt) {
+      return prompt(
+        `${sourceHeader}Translate this. ${footer}`,
+        { grammar: languageGrammar }
+      );
+    },
+  
+    promptFixCompileErrors(candidate, errors, prompt) {
+      return prompt(
+        `${sourceHeader}Last Translation:\n===\n${candidate.source}\n---\nFix Issues:\n===\n${errors}\n---\n${footer}`,
+        { grammar: languageGrammar }
+      );
+    },
+
+    async promptRating(candidate, comparison, prompt) {
+      const ratingResult = await prompt(
+        `${JSON.stringify(
+          comparison,
+          null,
+          2
+        )}\nStrictly do NOT mention the values, quotes, or any examples. The expected and output are NOT equal. Rate similarity of expected and output, 1 = no similarity, 100 = exact match, (1-100): `,
+        {
+          grammar: ratingGrammar,
+          temperature: 0.1,
+          maxTokens: 1024,
+        }
+      );
+      const [ratingStr, ratingReasonFull] = ratingResult.split("\n");
+      const rating = parseFloat(ratingStr) / 100;
+      const explanation = ratingReasonFull.substring(ratingExplain.length).trim();
+      return {
+        explanation,
+        rating
+      };
+    },
+
+    promptFixTestErrors(candidate, results, prompt) {
+      let promptText = `${sourceHeader}Last Translation:\n===\n${candidate.source}\n---\n`;
+      for (const result of results) {
+        promptText += `Erroneous Stdout:\n===\n${result.output}\n---\nExpected Stdout:\n===\n${result.expected}\n---\n${result.explanation}\n###\n`;
+      }
+      promptText += `Fix Issues. ${footer}`;
+      return prompt(
+        promptText,
+        { grammar: languageGrammar }
+      );
+    },
+
+    promptCrossoverBreedFixup(combined, prompt) {
+      return prompt(
+        `${sourceHeader}Combined Translation:\n===\n${combined}\n---\nFix Issues. ${footer}`,
+        { grammar: languageGrammar }
+      );
+    },
+
+    promptMutationFixup(mutated, prompt) {
+      return prompt(
+        `${sourceHeader}Mutated Translation:\n===\n${mutated}\n---\nFix Issues. ${footer}`,
+        { grammar: languageGrammar }
+      );
     },
   });
 /*

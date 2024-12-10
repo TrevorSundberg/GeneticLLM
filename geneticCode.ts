@@ -39,17 +39,31 @@ export interface CodeError {
 export type CodeRuntimeInput = string;
 export type CodeRuntimeOutput = string;
 
+export type LLMOptions = Omit<Omit<llm.LLamaChatPromptOptions, "onTextChunk">, "seed">;
+export type LLMPrompt = (promptStr: string, options?: LLMOptions) => Promise<string> | string;
+
+export interface CodeTestCompare {
+  expected: CodeRuntimeOutput;
+  output: CodeRuntimeOutput;
+};
+
+export interface CodeTestCompareRating {
+  // A number between [0, 1]
+  rating: number;
+
+  // A description as to what was different between the expected and the output
+  explanation: string;
+};
+
+export type CodeTestResult = CodeTestCompare & CodeTestCompareRating & {
+  input: string
+};
+
 export interface CodeGeneticConfig extends GeneticConfigTweakables {
   llmModelPath: string;
 
   // Default is 3
   llmIterations?: number;
-
-  languageDescription: string;
-
-  languageGrammar?: string;
-
-  sourceOrInstructions: CodeSource;
 
   // The inputs that we wish to test the code with
   // We use these with both runSample (to get the expected output) and runCompiled (to test our generated code)
@@ -76,6 +90,18 @@ export interface CodeGeneticConfig extends GeneticConfigTweakables {
   testPerformance: (
     code: CodeCandidate
   ) => Promise<number | void> | number | void;
+
+  promptRandomCandidate(prompt: LLMPrompt): Promise<CodeSource> | CodeSource;
+
+  promptFixCompileErrors(candidate: CodeCandidate, errors: string, prompt: LLMPrompt): Promise<CodeSource> | CodeSource;
+
+  promptRating(candidate: CodeCandidate, comparison: CodeTestCompare, prompt: LLMPrompt): Promise<CodeTestCompareRating> | CodeTestCompareRating;
+
+  promptFixTestErrors(candidate: CodeCandidate, results: CodeTestResult[], prompt: LLMPrompt): Promise<CodeSource> | CodeSource;
+
+  promptCrossoverBreedFixup(combined: CodeSource, prompt: LLMPrompt): Promise<CodeSource> | CodeSource;
+
+  promptMutationFixup(mutated: CodeSource, prompt: LLMPrompt): Promise<CodeSource> | CodeSource;
 }
 
 const cosineSimilarity = (vecA: Float32Array, vecB: Float32Array): number => {
@@ -97,6 +123,17 @@ const getEmbedding = async (
   return embedding.data as Float32Array;
 };
 
+let llamaPromise: Promise<llm.Llama> | undefined = undefined;
+export const getLlama = () => {
+  if (llamaPromise) {
+    return llamaPromise;
+  }
+  llamaPromise = llm.getLlama({
+    logLevel: llm.LlamaLogLevel.disabled,
+  });
+  return llamaPromise;
+};
+
 interface TestResult {
   input: CodeRuntimeInput;
   output: CodeRuntimeOutput;
@@ -108,9 +145,6 @@ const addUniqueTestResult = (set: Set<string>, output: CodeRuntimeOutput) => {
 }
 
 export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
-  const sourceHeader = `Original Source:\n===\n${config.sourceOrInstructions}\n---\n`;
-  const footer = `Strictly output ONLY safe ${config.languageDescription}, no surrounding explanations, no examples, no hard-coded test-inputs, nothing else:`;
-
   const uniqueSampleTestOutputs = new Set<string>();
   const testSamples: TestResult[] = [];
   for (const testInput of config.testInputs) {
@@ -140,26 +174,13 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
     return cosineSimilarity(embedding1, embedding2);
   };
 
-  const llama = await llm.getLlama({
-    logLevel: llm.LlamaLogLevel.disabled,
-  });
+  const llama = await getLlama();
   const model = await llama.loadModel({
     modelPath: config.llmModelPath,
   });
-  const ratingExplain = "Explain what must be fixed for output to match expected: ";
-  const ratingGrammar = new llm.LlamaGrammar(llama, {
-    grammar: `root ::= ([1-9] [0-9]? | "100") "\n${ratingExplain}" [^\n]+`,
-  });
-  const languageGrammar = config.languageGrammar
-    ? new llm.LlamaGrammar(llama, { grammar: config.languageGrammar })
-    : undefined;
 
   let prompting = false;
-  const prompt = async (
-    seed: number,
-    prompt: string,
-    options?: llm.LLamaChatPromptOptions
-  ) => {
+  const promptCallback = async (seed: number, promptStr: string, options?: LLMOptions): Promise<string> => {
     if (prompting) {
       throw new Error("CANNOT PROMPT TWICE");
     }
@@ -169,10 +190,9 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
       contextSequence: context.getSequence(),
     });
 
-    console.log("SEED:", seed, "PROMPT:", prompt);
-    const result = await session.prompt(prompt, {
-      temperature: 0.7,
-      ...options,
+    console.log("SEED:", seed, "PROMPT:", promptStr);
+    const result = await session.prompt(promptStr, {
+      ...options as llm.LLamaChatPromptOptions,
       seed,
       onTextChunk(text) {
         process.stdout.write(text);
@@ -217,11 +237,8 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
       const uniqueSeed = newUniqueSeed(random);
       return {
         uniqueSeed,
-        source: await prompt(
-          uniqueSeed,
-          `${sourceHeader}Translate this. ${footer}`,
-          { grammar: languageGrammar }
-        ),
+        source: await config.promptRandomCandidate((promptStr, options) =>
+          promptCallback(uniqueSeed, promptStr, options)),
       };
     },
 
@@ -251,17 +268,14 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
           totalRunSeconds: 0,
         };
         if (compileErrors) {
-          newCandidate.source = await prompt(
-            currentCandidate.uniqueSeed,
-            `${sourceHeader}Last Translation:\n===\n${currentCandidate.source}\n---\nFix Issues:\n===\n${compileErrors}\n---\n${footer}`,
-            { grammar: languageGrammar }
-          );
+          newCandidate.source = await config.promptFixCompileErrors(currentCandidate, compileErrors, (promptStr, options) =>
+            promptCallback(currentCandidate.uniqueSeed, promptStr, options));
         } else {
-          let promptText = `${sourceHeader}Last Translation:\n===\n${currentCandidate.source}\n---\n`;
           // Shuffle the inputs so that the LLM won't get stuck on specific inputs
           const testSamplesShuffled = shuffle([...testSamples], random);
           let failedAnyTest = false;
           const uniqueCompiledTestOutputs = new Set<string>();
+          const testResults: CodeTestResult[] = [];
           for (const testSample of testSamplesShuffled) {
             const sampleResult = testSample.output;
             const compiledResult = await config.runCompiled(
@@ -279,26 +293,17 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
               // Asking the LLM for a comparison is great because it can do slightly more in depth analysis
               // and discover similar patterns between them (meaning the translation can be on the right track)
               // However the LLM can tend to occasionally hallucinate, so we also use sentence similarity
-              const compare = {
+              const comparison = {
                 expected: sampleResult,
                 output: compiledResult,
               };
-              const ratingResult = await prompt(
-                currentCandidate.uniqueSeed,
-                `${JSON.stringify(
-                  compare,
-                  null,
-                  2
-                )}\nStrictly do NOT mention the values, quotes, or any examples. The expected and output are NOT equal. Rate similarity of expected and output, 1 = no similarity, 100 = exact match, (1-100): `,
-                {
-                  grammar: ratingGrammar,
-                  temperature: 0.1,
-                  maxTokens: 1024,
-                }
-              );
-              const [ratingStr, ratingReasonFull] = ratingResult.split("\n");
-              const rating = parseInt(ratingStr) / 100;
-              const ratingReason = ratingReasonFull.substring(ratingExplain.length);
+              const ratingResult = await config.promptRating(currentCandidate, comparison, (promptStr, options) =>
+                promptCallback(currentCandidate.uniqueSeed, promptStr, options));
+              testResults.push({
+                ...comparison,
+                ...ratingResult,
+                input: testSample.input
+              });
 
               // Sentence similarity to compare the outputs
               // This also works really well for comparing the meanings of outputs
@@ -320,12 +325,12 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
 
               // We don't ever allow the combined to be 1, as it should never be exactly the same as a passed test
               const combined = Math.min(
-                (rating + similarity + lengthCompare) / 3,
+                (ratingResult.rating + similarity + lengthCompare) / 3,
                 0.999999
               );
               console.log(
                 "rating",
-                rating,
+                ratingResult,
                 "similarity",
                 similarity,
                 "lengthCompare",
@@ -334,8 +339,6 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
                 combined
               );
               fitness.passedTests += combined;
-
-              promptText += `Erroneous Stdout:\n===\n${compiledResult}\n---\nExpected Stdout:\n===\n${sampleResult}\n---\n${ratingReason}\n###\n`;
             }
           }
 
@@ -348,12 +351,8 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
           console.log("uniqueTestResults", fitness.uniqueTestResults);
 
           if (failedAnyTest) {
-            promptText += `Fix Issues. ${footer}`;
-            newCandidate.source = await prompt(
-              currentCandidate.uniqueSeed,
-              promptText,
-              { grammar: languageGrammar }
-            );
+            newCandidate.source = await config.promptFixTestErrors(currentCandidate, testResults, (promptStr, options) =>
+              promptCallback(currentCandidate.uniqueSeed, promptStr, options));
           } else {
             const startMs = performance.now();
             const perfResult = await config.testPerformance(currentCandidate);
@@ -423,11 +422,8 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
 
       const combined = combinedLines.join("\n");
 
-      const source = await prompt(
-        uniqueSeed,
-        `${sourceHeader}Combined Translation:\n===\n${combined}\n---\nFix Issues. ${footer}`,
-        { grammar: languageGrammar }
-      );
+      const source = await config.promptCrossoverBreedFixup(combined, (promptStr, options) =>
+        promptCallback(uniqueSeed, promptStr, options));
       return {
         uniqueSeed,
         source,
@@ -456,11 +452,8 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
       console.log("MUTATED TO:");
       console.log(mutatedSource);
 
-      const source = await prompt(
-        candidate.uniqueSeed,
-        `${sourceHeader}Mutated Translation:\n===\n${mutatedSource}\n---\nFix Issues. ${footer}`,
-        { grammar: languageGrammar }
-      );
+      const source = await config.promptMutationFixup(mutatedSource, (promptStr, options) =>
+        promptCallback(candidate.uniqueSeed, promptStr, options));
 
       return {
         uniqueSeed: candidate.uniqueSeed,
