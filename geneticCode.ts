@@ -65,6 +65,9 @@ export interface CodeGeneticConfig extends GeneticConfigTweakables {
   // Default is 3
   llmIterations?: number;
 
+  // Default is 0.65
+  codeLineSelectionBias?: number;
+
   // The inputs that we wish to test the code with
   // We use these with both runSample (to get the expected output) and runCompiled (to test our generated code)
   testInputs: CodeRuntimeInput[];
@@ -405,8 +408,9 @@ export const geneticCodeConfig = async (config: CodeGeneticConfig) => {
       let bIndex = 0;
       const totalLength = aLines.length + bLines.length;
       const aProbability = aLines.length / totalLength;
+      const codeLineSelectionBias = defaulted(config.codeLineSelectionBias, 0.65);
       while (aIndex < aLines.length && bIndex < bLines.length) {
-        const addLine = random() < 0.5;
+        const addLine = random() < codeLineSelectionBias;
         if (random() < aProbability) {
           if (addLine) {
             combinedLines.push(aLines[aIndex]);
