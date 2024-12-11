@@ -20,6 +20,12 @@ export interface GeneticConfigTweakables {
   // Default is 0.35
   elitism?: number;
 
+  // A [0, 1] value indicating the percentage of top candidates that we keep every round
+  // This is to ensure that we don't regress in our solution finding
+  // This value is multiplied by the populationSize and rounded up to the nearest whole value
+  // Default is 0.05 (5% of candidates)
+  keepTopCandidates?: number;
+
   // A [0, 1] probability that we introduce a new random candidate instead of breeding
   // Default is 0.01
   diversityInjectionRate?: number;
@@ -116,7 +122,15 @@ export const geneticPass = async <Candidate, Fitness>(
       ? config.mutate(candidate, defaulted(config.mutationRate, 0.005), random)
       : candidate;
 
+  const keepTopCandidates = Math.ceil(defaulted(config.keepTopCandidates, 0.05) * populationSize);
+  console.log("keepTopCandidates", keepTopCandidates);
   for (let i = 0; i < populationSize; ++i) {
+    // Similar to graduation, the keepTopCandidates ensures that we always preserve top solutions
+    if (i < keepTopCandidates) {
+      population.push(measuredPopulation[measuredPopulation.length - 1 - i].candidate);
+      continue;
+    }
+
     // Diversity injection introduces random candidates into the population to maintain
     // variety, prevent premature convergence, and explore new areas of the search space
     const diversityInjectionRoll = random();
