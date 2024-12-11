@@ -332,4 +332,144 @@ Islanding with separate populations and a method for migration between them
 ---------
 easier setup script to use on vast.... it's like... not any faster than my machine...
 
+------------------
+
+for genetic prompting, we want to be able to build any kind of a prompt
+ - it's sort of a string template, but we may want to provide code too
+
+there's a few modes for simplicity:
+
+1. the prompt template is fixed, but the words that the LLM comes up with (a single string) is generated
+   - we insert their generated string plus the input of the test, and then compare to the output
+
+2. the prompt template is a simple interpolation, again taking input, but this time the AI is actually deciding where it goes
+
+3. the prompt template is code
+   - this allows us to input things like JSON, and the code can take the json and format it
+
+either provide a typescript interface, json schema, or sample json template
+
+interface PromptInput {
+  names: string[];
+  lookingForName: string;
+}
+
+wait, wouldn't this actually just be another case for genetic code then?
+
+instead of runSample, we already know all the inputs and outputs
+ - basically like we can wrap up the test inputs plus outputs
+
+and instead of a source program, we just have the instructions on what we want
+ - we already measure the closeness of the outputs
+
+```
+interface PromptInput {
+  names: string[];
+  lookingForName: string;
+}
+
+function GeneratePrompt(input: PromptInput): string;
+
+Implement the function GeneratePrompt which returns a string prompt to be given to an LLM. Do not output any explanation, only the GeneratePrompt implementation. The goal is to find a name that matches in similarity.
+```
+
+compile would need to include the typescript for calling GeneratePrompt, so it would have to compile
+
+'execute' just calls GeneratePrompt and passes in the input data
+
+hmmm, so that means the code input in this case is not just a string
+ - or maybe it is, maybe our code just deserializes it?
+ - I think we could just template it, like all we care about is that runSample takes the input
+
+crossover actually seems to be bad again, ooof
+ - maybe what I should do is a little more simple
+ - pick which ever one has the least number of lines, divide the other into N many chunks
+ - then go group by grouping and swap them
+
+lets work on providing better feedback to the LLM...
+
+
+or we can work on diversity measuring, or ressurection / restarting
+
+I can probably get a speedup with prompt caching since the start of the prompt is the same every time
+
+------------------
+
+side note, one idea I have when it comes to larger sized projects,
+ - maybe we can have it break everything down into functions with no dependencies
+ - it would have to be able to compile the original source code so it can test an individual function
+ - pretty difficult mind you
+
+maybe when we do llm fixup, we should also compare with
+the previous iteration to make sure we didn't make it worse
+
+current issues: No matter what, it appears that the llm iterations will always stomp the candidates
+ - even if we preserved it
+
+------------------
+
+maybe we can do something where we "preserve diverse candidates"
+ - choose N number of candidates to preserve
+ - start at the top, just select it directly
+ - go to the next candidate, 
+ - and compare the program, plus all it's outputs
+ - we can have a diversity score (for the program itself and the inputs)
+
+ - we walk down the list and measure all the diversities
+   - pick the first one that is more diverse
+
+so it looks like right now I'm measuring fitness but the output is the wrong one
+
+also, we shouldn't prompt to create the next candidate unless we have another iteration
+ - right now we measure first, and then run the llm iteration
+ - which means the last iteration / prompt is useless
+ - also no prompt occurs for performance either
+
+lets get this all outputting as json and start our visualization tools
+ - can I use vscode, and if so how is best
+ - obviously we can serve a web-ui too
+ - but I don't want to spend a lot of time doing that
+
+what kind of operations do people want to do in a genetic algorithm UI
+ - see which candidates are being measured / simulated
+ - see current output logs
+ - examine any candidate
+ - see the sorted array of fitnes for a generation
+ - rewind, manually adjust population, etc
+ - if generations were just files (show the iterations on code though)
+ - output the code file plus the json
+
+
+with llm iterations, I almost want to say there's a minimum and maximum number
+ - the minimum it must always do (picks the best of all)
+ - and the maximum will keep going if it never finds anything better
+
+regression is still the biggest issue
+
+lets just do something stupid where we keep top candidates purposefully
+
+---------------
+
+how do I want the prompt interface to work, separate functions for each type of prompt?
+ - I think so
+ - I think we should also just create the llm.LlamaChatSession
+ 
+
+it's annoying because they may have to create a grammar, I don't want to parse it every time
+ - either I give them access to the llama instance... or I have to cache grammars by string in a map
+ - yuck to both
+ - I'd have to call some kind of setup function where I pass them the llama instance
+ - ugh I hate that
+
+I feel like if they already have to provide the model,
+it's too much of an abstraction to not just give them the session directly
+
+------------
+
+eventually if we get this all working, I really like the idea of a separate LLM task that
+goes through and and pulls out functions (ideally leaf level functions, helpers first)
+ - then one by one, we generate test inputs and test each function by itself
+ - even just getting it so we can isolate a function and call it is going to be a bit of a chore
+
+
 
